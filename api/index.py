@@ -1,74 +1,38 @@
 import os
-import requests
+import json
+import urllib.request
 from flask import Flask, request
 import telebot
 from telebot import types
 
 app = Flask(__name__)
 
-def get_rates():
-    data = {}
+def get_usd_syp():
+    urls = [
+        "https://jsdelivr.net",
+        "https://er-api.com"
+    ]
     headers = {"User-Agent": "Mozilla/5.0"}
     
-    # 1. جلب أسعار العملات
+    # المحاولة 1: شبكة jsdelivr السريعة جداً (تعمل دائماً على Vercel)
     try:
-        res = requests.get("https://er-api.com", headers=headers, timeout=5).json()
-        rates = res.get("rates", {})
-        data["SYP"] = f"{int(rates.get('SYP', 0)):,}"
-        data["TRY"] = round(rates.get("TRY", 0), 2)
-        data["SAR"] = round(rates.get("SAR", 0), 2)
-        data["AED"] = round(rates.get("AED", 0), 2)
-        data["EGP"] = round(rates.get("EGP", 0), 2)
-        data["JOD"] = round(rates.get("JOD", 0), 3)
-        data["EUR"] = round(rates.get("EUR", 0), 4)
-        data["raw_rates"] = rates
-    except Exception:
-        return None
+        req = urllib.request.Request(urls[0], headers=headers)
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode())
+            syp = data["usd"]["syp"]
+            return round(float(syp), 2)
+    except Exception as e1:
+        err1 = str(e1)
 
-    # 2. جلب البيتكوين والذهب من مصدر بديل لا يحظر السيرفرات
+    # المحاولة 2: المصدر الاحتياطي
     try:
-        btc_res = requests.get("https://coinbase.com", headers=headers, timeout=4).json()
-        btc_price = float(btc_res["data"]["amount"])
-        data["BTC"] = f"{int(btc_price):,}"
-    except Exception:
-        data["BTC"] = "غير متاح"
-
-    try:
-        # سعر أونصة الذهب (PAXG يساوي أونصة ذهب حقيقية)
-        gold_res = requests.get("https://coinbase.com", headers=headers, timeout=4).json()
-        gold_oz = float(gold_res["data"]["amount"])
-        gold_24 = round(gold_oz / 31.1035, 2)
-        gold_21 = round(gold_24 * 0.875, 2)
-        data["GOLD_OZ"] = f"{round(gold_oz, 1):,}"
-        data["GOLD_24"] = gold_24
-        data["GOLD_21"] = gold_21
-    except Exception:
-        data["GOLD_OZ"] = "غير متاح"
-        data["GOLD_24"] = "-"
-        data["GOLD_21"] = "-"
-
-    return data
-
-def format_message(data, updated=False):
-    title = "💱 **نشرة أسعار الصرف والذهب (محدّثة)**" if updated else "💱 **نشرة أسعار الصرف والذهب اللحظية**"
-    return (
-        f"{title}\n"
-        "━━━━━━━━━━━━━━━━━━\n"
-        f"🇸🇾 **الليرة السورية (رسمي):** `{data['SYP']}` ل.س\n"
-        f"🇹🇷 **الليرة التركية:** `{data['TRY']}` ليرة\n"
-        f"🇸🇦 **الريال السعودي:** `{data['SAR']}` ريال\n"
-        f"🇦🇪 **الدرهم الإماراتي:** `{data['AED']}` درهم\n"
-        f"🇪🇬 **الجنيه المصري:** `{data['EGP']}` جنيه\n"
-        f"🇯🇴 **الدينار الأردني:** `{data['JOD']}` دينار\n"
-        f"🇪🇺 **اليورو (EUR):** `{data['EUR']}` دولار\n"
-        "━━━━━━━━━━━━━━━━━━\n"
-        f"🪙 **أونصة الذهب:** `${data['GOLD_OZ']}`\n"
-        f"✨ **غرام ذهب 24:** `${data['GOLD_24']}`\n"
-        f"✨ **غرام ذهب 21:** `${data['GOLD_21']}`\n"
-        f"₿ **البيتكوين:** `${data['BTC']}`\n"
-        "━━━━━━━━━━━━━━━━━━\n"
-        "💡 *أرسل أي رقم (مثلاً: 100) لتحويله من الدولار فوراً!*"
-    )
+        req = urllib.request.Request(urls[1], headers=headers)
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode())
+            syp = data["rates"]["SYP"]
+            return round(float(syp), 2)
+    except Exception as e2:
+        return f"ERR: {err1} | {str(e2)}"
 
 @app.route('/', methods=['POST', 'GET'])
 def webhook():
@@ -78,50 +42,60 @@ def webhook():
         
     bot = telebot.TeleBot(token, threaded=False)
 
-    @bot.message_handler(commands=['start', 'prices'])
-    def send_prices(message):
-        data = get_rates()
-        if not data:
-            bot.reply_to(message, "⚠️ تعذر الاتصال بمصدر الأسعار، أعد المحاولة.")
+    @bot.message_handler(commands=['start', 'syp'])
+    def send_price(message):
+        rate = get_usd_syp()
+        if isinstance(rate, str):
+            bot.reply_to(message, f"⚠️ تفاصيل الخطأ:\n`{rate}`", parse_mode="Markdown")
             return
+            
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🔄 تحديث الأسعار الآن", callback_data="refresh"))
-        bot.send_message(message.chat.id, format_message(data), parse_mode="Markdown", reply_markup=markup)
+        markup.add(types.InlineKeyboardButton("🔄 تحديث السعر", callback_data="refresh"))
+        
+        text = (
+            "💵 **سعر صرف الدولار مقابل الليرة السورية**\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            f"🇺🇸 **1 دولار أمريكي** = `{rate:,}` ل.س\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "💡 *أرسل أي مبلغ بالدولار (مثلاً: 50) لتحويله فوراً!*"
+        )
+        bot.send_message(message.chat.id, text, parse_mode="Markdown", reply_markup=markup)
 
     @bot.callback_query_handler(func=lambda call: call.data == "refresh")
     def callback_refresh(call):
-        data = get_rates()
-        if data:
+        rate = get_usd_syp()
+        if not isinstance(rate, str):
             markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🔄 تحديث الأسعار الآن", callback_data="refresh"))
+            markup.add(types.InlineKeyboardButton("🔄 تحديث السعر", callback_data="refresh"))
+            text = (
+                "💵 **سعر صرف الدولار مقابل الليرة السورية (محدّث)**\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                f"🇺🇸 **1 دولار أمريكي** = `{rate:,}` ل.س\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                "💡 *أرسل أي مبلغ بالدولار لتحويله فوراً!*"
+            )
             try:
-                bot.edit_message_text(format_message(data, True), call.message.chat.id, call.message.message_id, parse_mode="Markdown", reply_markup=markup)
+                bot.edit_message_text(text, call.message.chat.id, call.message.message_id, parse_mode="Markdown", reply_markup=markup)
             except Exception:
                 pass
         bot.answer_callback_query(call.id, "✅ تم التحديث!")
 
     @bot.message_handler(func=lambda message: True)
-    def convert_amount(message):
+    def convert_usd(message):
         try:
             amount = float(message.text.strip())
-            data = get_rates()
-            if not data:
-                bot.reply_to(message, "⚠️ تعذر جلب الأسعار للتحويل.")
+            rate = get_usd_syp()
+            if isinstance(rate, str):
+                bot.reply_to(message, "⚠️ تعذر جلب السعر حالياً.")
                 return
-            r = data["raw_rates"]
-            reply = (
-                f"💵 **تحويل مبلغ ${amount:,} دولار أمريكي:**\n"
-                "━━━━━━━━━━━━━━━━━━\n"
-                f"🇸🇾 **سوري:** `{int(amount * r['SYP']):,}` ل.س\n"
-                f"🇹🇷 **تركي:** `{round(amount * r['TRY'], 2):,}` ليرة\n"
-                f"🇸🇦 **سعودي:** `{round(amount * r['SAR'], 2):,}` ريال\n"
-                f"🇦🇪 **إماراتي:** `{round(amount * r['AED'], 2):,}` درهم\n"
-                f"🇪🇬 **مصري:** `{round(amount * r['EGP'], 2):,}` جنيه\n"
-                f"🇪🇺 **يورو:** `{round(amount * r['EUR'], 2):,}` يورو"
+            total = int(amount * rate)
+            bot.reply_to(
+                message,
+                f"💵 **{amount:,} دولار** = `{total:,}` ليرة سورية",
+                parse_mode="Markdown"
             )
-            bot.reply_to(message, reply, parse_mode="Markdown")
         except ValueError:
-            bot.reply_to(message, "أرسل `/start` لعرض النشرة، أو اكتب رقماً فقط (مثل `50`) لتحويله.")
+            bot.reply_to(message, "أرسل `/start` لعرض السعر، أو اكتب رقماً بالدولار (مثل `100`) لتحويله.")
 
     if request.method == 'POST':
         json_string = request.get_data().decode('utf-8')
@@ -129,4 +103,4 @@ def webhook():
         bot.process_new_updates([update])
         return "OK", 200
         
-    return "Exchange Rate Bot is Running!", 200
+    return "USD/SYP Bot is Running!", 200
