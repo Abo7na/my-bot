@@ -8,23 +8,42 @@ app = Flask(__name__)
 
 def get_rates():
     try:
-        # تجميع الرابط برمجياً لمنع المتصفح من قصه أثناء النسخ
-        host = "api." + "frankfurter" + ".app"
-        url = "https://" + host + "/latest?from=USD"
+        # تجميع الرابط برمجياً لحمايته من القصّ أثناء النسخ
+        host = "cdn." + "jsdelivr" + ".net"
+        path = "/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json"
+        url = "https://" + host + path
         
         r = requests.get(url, timeout=5)
         if r.status_code == 200:
-            rates = r.json().get("rates", {})
+            usd = r.json().get("usd", {})
             return {
-                "EUR": rates.get("EUR", "-"),
-                "TRY": rates.get("TRY", "-"),
-                "GBP": rates.get("GBP", "-"),
-                "CAD": rates.get("CAD", "-"),
-                "AUD": rates.get("AUD", "-")
+                "SYP": round(float(usd.get("syp", 0)), 2),
+                "TRY": round(float(usd.get("try", 0)), 2),
+                "SAR": round(float(usd.get("sar", 0)), 2),
+                "AED": round(float(usd.get("aed", 0)), 2),
+                "EGP": round(float(usd.get("egp", 0)), 2),
+                "JOD": round(float(usd.get("jod", 0)), 3),
+                "EUR": round(float(usd.get("eur", 0)), 4)
             }
         return f"Status: {r.status_code}"
     except Exception as e:
         return f"Err: {str(e)}"
+
+def format_msg(res, updated=False):
+    header = "💱 **نشرة أسعار الصرف اليوم (محدّثة)**" if updated else "💱 **نشرة أسعار الصرف اليوم**"
+    return (
+        f"{header}\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"🇸🇾 **الليرة السورية (رسمي):** `{res['SYP']:,.0f}` ل.س\n"
+        f"🇹🇷 **الليرة التركية:** `{res['TRY']}` ليرة\n"
+        f"🇸🇦 **الريال السعودي:** `{res['SAR']}` ريال\n"
+        f"🇦🇪 **الدرهم الإماراتي:** `{res['AED']}` درهم\n"
+        f"🇪🇬 **الجنيه المصري:** `{res['EGP']}` جنيه\n"
+        f"🇯🇴 **الدينار الأردني:** `{res['JOD']}` دينار\n"
+        f"🇪🇺 **اليورو (EUR):** `{res['EUR']}` دولار\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "💡 *أرسل أي مبلغ بالدولار (مثلاً: 100) لتحويله فوراً!*"
+    )
 
 @app.route('/', methods=['POST', 'GET'])
 def webhook():
@@ -43,18 +62,7 @@ def webhook():
             
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("🔄 تحديث الأسعار", callback_data="refresh"))
-        
-        text = (
-            "💱 **أسعار صرف الدولار اليوم**\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            f"🇪🇺 **اليورو (EUR):** `{res['EUR']}`\n"
-            f"🇹🇷 **الليرة التركية (TRY):** `{res['TRY']}`\n"
-            f"🇬🇧 **الجنيه الإسترليني (GBP):** `{res['GBP']}`\n"
-            f"🇨🇦 **الدولار الكندي (CAD):** `{res['CAD']}`\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            "💡 *أرسل أي مبلغ بالدولار لتحويله فوراً!*"
-        )
-        bot.send_message(message.chat.id, text, parse_mode="Markdown", reply_markup=markup)
+        bot.send_message(message.chat.id, format_msg(res), parse_mode="Markdown", reply_markup=markup)
 
     @bot.callback_query_handler(func=lambda call: call.data == "refresh")
     def callback_refresh(call):
@@ -62,18 +70,8 @@ def webhook():
         if not isinstance(res, str):
             markup = types.InlineKeyboardMarkup()
             markup.add(types.InlineKeyboardButton("🔄 تحديث الأسعار", callback_data="refresh"))
-            text = (
-                "💱 **أسعار صرف الدولار اليوم (محدّثة)**\n"
-                "━━━━━━━━━━━━━━━━━━\n"
-                f"🇪🇺 **اليورو (EUR):** `{res['EUR']}`\n"
-                f"🇹🇷 **الليرة التركية (TRY):** `{res['TRY']}`\n"
-                f"🇬🇧 **الجنيه الإسترليني (GBP):** `{res['GBP']}`\n"
-                f"🇨🇦 **الدولار الكندي (CAD):** `{res['CAD']}`\n"
-                "━━━━━━━━━━━━━━━━━━\n"
-                "💡 *أرسل أي مبلغ بالدولار لتحويله!*"
-            )
             try:
-                bot.edit_message_text(text, call.message.chat.id, call.message.message_id, parse_mode="Markdown", reply_markup=markup)
+                bot.edit_message_text(format_msg(res, True), call.message.chat.id, call.message.message_id, parse_mode="Markdown", reply_markup=markup)
             except Exception:
                 pass
         bot.answer_callback_query(call.id, "✅ تم التحديث!")
@@ -86,15 +84,19 @@ def webhook():
             if isinstance(res, str):
                 bot.reply_to(message, "⚠️ تعذر جلب السعر.")
                 return
-            bot.reply_to(
-                message,
-                f"💵 **{amount:,} دولار أمريكي:**\n"
+            reply = (
+                f"💵 **تحويل {amount:,} دولار أمريكي:**\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                f"🇸🇾 `{int(amount * res['SYP']):,}` ليرة سورية\n"
                 f"🇹🇷 `{round(amount * res['TRY'], 2):,}` ليرة تركية\n"
-                f"🇪🇺 `{round(amount * res['EUR'], 2):,}` يورو",
-                parse_mode="Markdown"
+                f"🇸🇦 `{round(amount * res['SAR'], 2):,}` ريال سعودي\n"
+                f"🇦🇪 `{round(amount * res['AED'], 2):,}` درهم إماراتي\n"
+                f"🇪🇬 `{round(amount * res['EGP'], 2):,}` جنيه مصري\n"
+                f"🇪🇺 `{round(amount * res['EUR'], 2):,}` يورو"
             )
+            bot.reply_to(message, reply, parse_mode="Markdown")
         except ValueError:
-            bot.reply_to(message, "أرسل `/start` لعرض الأسعار، أو اكتب رقماً بالدولار (مثل `100`).")
+            bot.reply_to(message, "أرسل `/start` لعرض النشرة، أو اكتب رقماً بالدولار (مثل `50`).")
 
     if request.method == 'POST':
         json_string = request.get_data().decode('utf-8')
@@ -102,4 +104,4 @@ def webhook():
         bot.process_new_updates([update])
         return "OK", 200
         
-    return "Bot Running!", 200
+    return "SYP Currency Bot Running!", 200
