@@ -107,7 +107,7 @@ def main_keyboard(bot_username=""):
 
 def back_home_keyboard():
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("🏠 القائمة الرئيسية والعودة", callback_data="refresh"))
+    markup.add(types.InlineKeyboardButton("🏠 العودة للقائمة الرئيسية", callback_data="refresh"))
     return markup
 
 def format_bulletin(d, updated=False):
@@ -290,7 +290,12 @@ def webhook():
             user_mode[uid] = mode
             markup = types.InlineKeyboardMarkup()
             markup.add(types.InlineKeyboardButton("❌ إلغاء وعودة للقائمة", callback_data="refresh"))
-            bot.send_message(cid, "✍️ أرسل الآن **المبلغ المراد تحويله** كرقم فقط (مثلاً: `100` أو `5000`):", parse_mode="Markdown", reply_markup=markup)
+            
+            prompt_text = "✍️ أرسل الآن **المبلغ المراد تحويله** كرقم فقط (مثلاً: `100`):"
+            if mode == "syp_usd":
+                prompt_text = "🇸🇾 ✍️ أرسل الآن المبلغ **بالليرة السورية الجديدة حصراً** كرقم فقط (مثلاً: `5000`):"
+
+            bot.send_message(cid, prompt_text, parse_mode="Markdown", reply_markup=markup)
             bot.answer_callback_query(call.id)
 
         elif call.data == "gold_menu":
@@ -427,13 +432,17 @@ def webhook():
                 "text": text,
                 "time": time.strftime("%H:%M")
             })
-            d = get_all_prices()
+            markup = types.InlineKeyboardMarkup(row_width=2)
+            markup.add(
+                types.InlineKeyboardButton("🧮 حاسبة أخرى", callback_data="calc_menu"),
+                types.InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="refresh")
+            )
             bot.send_message(
                 cid,
-                "✅ **تم استلام رسالتك وإرسالها للإدارة بنجاح!**\nشكراً لتواصلك معنا، سنقوم بمراجعتها والرد عليك قريباً.\n\n*(تم إرجاعك للقائمة الرئيسية تلقائياً)*",
-                parse_mode="Markdown"
+                "✅ **تم استلام رسالتك وإرسالها للإدارة بنجاح!**\nشكراً لتواصلك معنا، سنقوم بمراجعتها والرد عليك قريباً.",
+                parse_mode="Markdown",
+                reply_markup=markup
             )
-            bot.send_message(cid, format_bulletin(d), parse_mode="Markdown", reply_markup=main_keyboard(bot_username))
             return
 
         if mode == "admin_replying":
@@ -466,13 +475,17 @@ def webhook():
                     target = target / 100.0
                 price_alerts[uid] = target
                 user_mode[uid] = "usd_syp"
-                d = get_all_prices()
+                markup = types.InlineKeyboardMarkup(row_width=2)
+                markup.add(
+                    types.InlineKeyboardButton("🔔 ضبط منبّه آخر", callback_data="set_alert"),
+                    types.InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="refresh")
+                )
                 bot.send_message(
                     cid,
-                    f"🔔 **تم تفعيل منبّه الأسعار بنجاح!**\nسنجري مراقبة مستمرة، وسنرسل لك إشعاراً فورياً فور وصول مبيع الدولار إلى السعر المستهدف: **`{target:.2f}`** ل.س.\n\n*(تم العودة للقائمة الرئيسية تلقائياً)*",
-                    parse_mode="Markdown"
+                    f"🔔 **تم تفعيل منبّه الأسعار بنجاح!**\nسنجري مراقبة مستمرة، وسنرسل لك إشعاراً فورياً فور وصول مبيع الدولار إلى السعر المستهدف: **`{target:.2f}`** ل.س.",
+                    parse_mode="Markdown",
+                    reply_markup=markup
                 )
-                bot.send_message(cid, format_bulletin(d), parse_mode="Markdown", reply_markup=main_keyboard(bot_username))
             except ValueError:
                 bot.reply_to(message, "⚠️ يرجى إدخال رقم صحيح وواضح للسعر (مثلاً: `155` أو `155.5`).")
             return
@@ -492,12 +505,15 @@ def webhook():
                     f"• **القيمة الإجمالية بالدولار:** **`$ {total_usd:,.2f}`**\n"
                     f"• **القيمة بالليرة الجديدة 🇸🇾:** **`{total_new:,.2f}`** ل.س\n"
                     f"• **القيمة بالليرة القديمة 🇸🇾:** **`{total_old:,}`** ل.س\n"
-                    "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                    "*(تم إرجاعك للقائمة الرئيسية تلقائياً)*"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━"
                 )
                 user_mode[uid] = "usd_syp"
-                bot.send_message(cid, reply, parse_mode="Markdown")
-                bot.send_message(cid, format_bulletin(d), parse_mode="Markdown", reply_markup=main_keyboard(bot_username))
+                markup = types.InlineKeyboardMarkup(row_width=2)
+                markup.add(
+                    types.InlineKeyboardButton("⚖️ حساب وزن آخر", callback_data="gold_calc_start"),
+                    types.InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="refresh")
+                )
+                bot.send_message(cid, reply, parse_mode="Markdown", reply_markup=markup)
             except ValueError:
                 bot.reply_to(message, "⚠️ يرجى إرسال رقم صحيح لعدد الغرامات (مثلاً: `5` أو `2.5`).")
             return
@@ -510,30 +526,34 @@ def webhook():
             if mode == "usd_syp":
                 res_new = amount * rate_new
                 res_old = int(res_new * 100)
-                reply = f"💵 **حساب التحويل ({amount:,.2f} دولار أمريكي):**\n• بالليرة الجديدة 🇸🇾: **`{res_new:,.2f}`** ل.س\n• بالليرة القديمة 🇸🇾: **`{res_old:,}`** ل.س"
+                reply = f"💵 **حساب التحويل (`{amount:,.2f}` دولار أمريكي):**\n• بالليرة الجديدة 🇸🇾: **`{res_new:,.2f}`** ل.س\n• بالليرة القديمة 🇸🇾: **`{res_old:,}`** ل.س"
             elif mode == "syp_usd":
                 usd_val = amount / (rate_new * 100) if amount >= 2000 else amount / rate_new
-                reply = f"🇸🇾 **حساب التحويل ({amount:,.0f} ليرة سورية):**\n💵 القيمة بالدولار: **`{usd_val:,.2f}`** دولار"
+                reply = f"🇸🇾 **حساب التحويل (`{amount:,.0f}` ليرة سورية جديدة):**\n💵 القيمة بالدولار: **`{usd_val:,.2f}`** دولار"
             elif mode == "try_syp":
                 try_in_syp = rate_new / d["try_sell"]
                 res_new = amount * try_in_syp
                 res_old = int(res_new * 100)
-                reply = f"🇹🇷 **حساب التحويل ({amount:,.2f} ليرة تركية):**\n• بالليرة الجديدة 🇸🇾: **`{res_new:,.2f}`** ل.س\n• بالليرة القديمة 🇸🇾: **`{res_old:,}`** ل.س"
+                reply = f"🇹🇷 **حساب التحويل (`{amount:,.2f}` ليرة تركية):**\n• بالليرة الجديدة 🇸🇾: **`{res_new:,.2f}`** ل.س\n• بالليرة القديمة 🇸🇾: **`{res_old:,}`** ل.س"
             elif mode == "eur_syp":
                 eur_in_syp = rate_new * 1.10
                 res_new = amount * eur_in_syp
                 res_old = int(res_new * 100)
-                reply = f"🇪🇺 **حساب التحويل ({amount:,.2f} يورو):**\n• بالليرة الجديدة 🇸🇾: **`{res_new:,.2f}`** ل.س\n• بالليرة القديمة 🇸🇾: **`{res_old:,}`** ل.س"
+                reply = f"🇪🇺 **حساب التحويل (`{amount:,.2f}` يورو):**\n• بالليرة الجديدة 🇸🇾: **`{res_new:,.2f}`** ل.س\n• بالليرة القديمة 🇸🇾: **`{res_old:,}`** ل.س"
             else:
                 res_new = amount * rate_new
                 reply = f"💵 **النتيجة:** **`{res_new:,.2f}`** ل.س جديد"
 
             user_mode[uid] = "usd_syp"
-            bot.send_message(cid, f"{reply}\n\n*(تم إرجاعك للقائمة الرئيسية تلقائياً)*", parse_mode="Markdown")
-            bot.send_message(cid, format_bulletin(d), parse_mode="Markdown", reply_markup=main_keyboard(bot_username))
+            markup = types.InlineKeyboardMarkup(row_width=2)
+            markup.add(
+                types.InlineKeyboardButton("🧮 تحويل مبلغ آخر", callback_data="calc_menu"),
+                types.InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="refresh")
+            )
+            bot.send_message(cid, reply, parse_mode="Markdown", reply_markup=markup)
             
         except ValueError:
-            bot.reply_to(message, "⚠️ عذراً، يرجى إرسال رقم صحيح للتحويل، أو استخدم الأزرار التفاعلية الموجودة أسفل النشرة.")
+            bot.reply_to(message, "⚠️ عذراً، يرجى إرسال رقم صحيح للتحويل، أو استخدم الأزرار التفاعلية الموجودة.")
 
     if request.method == 'POST':
         json_string = request.get_data().decode('utf-8')
