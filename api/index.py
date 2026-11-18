@@ -90,7 +90,7 @@ def check_subscription(bot, user_id):
     return False
 
 def main_keyboard(bot_username=""):
-    share_url = "https://" + "t." + f"me/share/url?url=https://t.me/{bot_username}&text=أفضل+منصة+لأسعار+الصرف+والذهب+في+سوريا+-+سوريا+كاش"
+    share_url = "https://" + "t." + f"me/share/url?url=https://t.me/{bot_username}&text=تابع+أسعار+الصرف+والذهب+لحظة+بلحظة+عبر+بوت+سوريا+كاش+-+Syria+Cash"
     
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
@@ -111,8 +111,8 @@ def back_home_keyboard():
     return markup
 
 def format_bulletin(d, updated=False):
-    header = "🌟 **منصة سوريا كاش الاقتصادية** 🌟"
-    sub = "📊 *(نشرة محدثة للأسعار اللحظية في السوق السوري)*" if updated else "📊 *(النشرة الرسمية المباشرة للعملات)*"
+    header = "🌟 **سوريا كاش - Syria Cash** 🌟"
+    sub = "📊 *(النشرة المباشرة للعملات والذهب)*" if updated else "📊 *(النشرة الرسمية المباشرة للعملات)*"
     buy_old = int(d["syp_buy_new"] * 100)
     sell_old = int(d["syp_sell_new"] * 100)
     
@@ -120,20 +120,20 @@ def format_bulletin(d, updated=False):
         f"{header}\n"
         f"{sub}\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "🇺🇸 **سعر الدولار الأمريكي (السوق المتداول):**\n"
-        f"  ▪️ **مبيع:** ` {d['syp_sell_new']:.2f} ` 🟢 ل.س  *( `{sell_old:,}` قديمة )*\n"
-        f"  ▪️ **شراء:** ` {d['syp_buy_new']:.2f} ` 🔴 ل.س  *( `{buy_old:,}` قديمة )*\n"
-        f"  🟢 *مباشر ({d['time_str']}) | {d['change_pct']} 📈*\n\n"
-        "🏛 **سعر الدولار الرسمي (مصرف سوريا المركزي):**\n"
-        f"  ▪️ **السعر:** ` {d['syp_official_new']:.2f} ` 🟢 ل.س\n"
+        "🇺🇸 🇸🇾 **الدولار الأمريكي (السوق):**\n"
+        f"  ▪️ **مبيع:** **`{d['syp_sell_new']:.2f}`** 🟢 ل.س *( **`{sell_old:,}`** قديمة )*\n"
+        f"  ▪️ **شراء:** **`{d['syp_buy_new']:.2f}`** 🔴 ل.س *( **`{buy_old:,}`** قديمة )*\n"
+        f"  🟢 *مباشر | {d['change_pct']} 📈*\n\n"
+        "🏛 🇸🇾 **الدولار الرسمي (المركزي):**\n"
+        f"  ▪️ **السعر:** **`{d['syp_official_new']:.2f}`** 🟢 ل.س\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "💱 **أسعار العملات (مبيع وشراء مقابل الدولار):**\n"
-        f"  🇹🇷 **الليرة التركية:** مبيع `{d['try_sell']}` 🟢 | شراء `{d['try_buy']}` 🔴\n"
-        f"  🇰🇼 **الدينار الكويتي:** مبيع `{d['kwd_sell']}` 🟢 | شراء `{d['kwd_buy']}` 🔴\n"
-        f"  🇦🇪 **الدرهم الإماراتي:** مبيع `{d['aed_sell']}` 🟢 | شراء `{d['aed_buy']}` 🔴\n"
-        f"  🇸🇦 **الريال السعودي:** مبيع `{d['sar_sell']}` 🟢 | شراء `{d['sar_buy']}` 🔴\n"
+        "💱 **أسعار العملات (مبيع وشراء):**\n"
+        f"  🇹🇷 **تركيا:** مبيع **`{d['try_sell']}`** 🟢 | شراء **`{d['try_buy']}`** 🔴\n"
+        f"  🇰🇼 **الكويت:** مبيع **`{d['kwd_sell']}`** 🟢 | شراء **`{d['kwd_buy']}`** 🔴\n"
+        f"  🇦🇪 **الإمارات:** مبيع **`{d['aed_sell']}`** 🟢 | شراء **`{d['aed_buy']}`** 🔴\n"
+        f"  🇸🇦 **السعودية:** مبيع **`{d['sar_sell']}`** 🟢 | شراء **`{d['sar_buy']}`** 🔴\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "💡 *ساهم في استمرار وتطوير البوت عبر مشاركته مع أصدقائك في المجموعات والرسائل!*"
+        "💡 *شارك **سوريا كاش - Syria Cash** مع أصدقائك وفي المجموعات ليصلك كل جديد لحظة بلحظة!*"
     )
 
 def check_and_trigger_alerts(bot, current_sell):
@@ -143,7 +143,7 @@ def check_and_trigger_alerts(bot, current_sell):
             try:
                 bot.send_message(
                     uid,
-                    f"🚨 **تنبيه هام من سوريا كاش!**\n\nلقد وصل سعر مبيع الدولار الآن في السوق إلى **`{current_sell:.2f}`** ل.س، وهو السعر المستهدف الذي طالبت بتنبيهك عند وصوله (`{target}`).",
+                    f"🚨 **تنبيه هام من سوريا كاش - Syria Cash!**\n\nلقد وصل سعر مبيع الدولار الآن في السوق إلى **`{current_sell:.2f}`** ل.س، وهو السعر المستهدف الذي طالبت بتنبيهك عند وصوله (`{target}`).",
                     parse_mode="Markdown"
                 )
                 triggered_users.append(uid)
@@ -179,7 +179,7 @@ def webhook():
         d = get_all_prices()
         text = format_bulletin(d, True)
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🤖 افتح بوت سوريا كاش", url="https://" + "t." + f"me/{bot_username}"))
+        markup.add(types.InlineKeyboardButton("🤖 افتح بوت سوريا كاش - Syria Cash", url="https://" + "t." + f"me/{bot_username}"))
         
         r1 = types.InlineQueryResultArticle(
             id='1',
@@ -201,7 +201,7 @@ def webhook():
             markup.add(types.InlineKeyboardButton("✅ لقد اشتركت، تحقق الآن", callback_data="check_sub"))
             bot.send_message(
                 message.chat.id,
-                "⚠️ **عذراً، اشترك في القناة أولاً لتستمتع بخدمات البوت:**\n\nنرحّب بك في **سوريا كاش**، يرجى الانضمام للقناة الرسمية لتفعيل حسابك:\n\n🔗 " + CHANNEL_URL,
+                "⚠️ **عذراً، اشترك في القناة أولاً لتستمتع بخدمات البوت:**\n\nنرحّب بك في **سوريا كاش - Syria Cash**، يرجى الانضمام للقناة الرسمية لتفعيل حسابك:\n\n🔗 " + CHANNEL_URL,
                 parse_mode="Markdown",
                 reply_markup=markup
             )
@@ -242,7 +242,7 @@ def webhook():
             custom_syp["sell"] = val
             custom_syp["buy"] = round(val - 0.5, 2)
             check_and_trigger_alerts(bot, val)
-            bot.reply_to(message, f"✅ تم تحديث سعر صرف الدولار بنجاح إلى `{val:.2f}` جديدة (`{int(val*100):,}` قديمة).", parse_mode="Markdown", reply_markup=back_home_keyboard())
+            bot.reply_to(message, f"✅ تم تحديث سعر صرف الدولار بنجاح إلى **`{val:.2f}`** جديدة (`{int(val*100):,}` قديمة).", parse_mode="Markdown", reply_markup=back_home_keyboard())
         except Exception:
             bot.reply_to(message, "⚠️ صيغة الأمر غير صحيحة. اكتب الأمر متبوعاً بالسعر الجديد، مثلاً:\n`/set 150` أو `/set 15000`", parse_mode="Markdown", reply_markup=back_home_keyboard())
 
@@ -304,11 +304,11 @@ def webhook():
             gold_info = (
                 "🪙 **المرجع الشامل لأسعار الذهب (مبيع وشراء بالدولار الأمريكي)**\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"• **أونصة الذهب:** مبيع `$ {g['oz_sell']:,}` 🟢 | شراء `$ {g['oz_buy']:,}` 🔴\n"
-                f"• **غرام عيار 24:** مبيع `$ {g['g24_sell']}` 🟢 | شراء `$ {g['g24_buy']}` 🔴\n"
-                f"• **غرام عيار 21:** مبيع `$ {g['g21_sell']}` 🟢 | شراء `$ {g['g21_buy']}` 🔴\n"
-                f"• **غرام عيار 18:** مبيع `$ {g['g18_sell']}` 🟢 | شراء `$ {g['g18_buy']}` 🔴\n"
-                f"• **غرام 21 (بالسوري):** ` {d['gold_21_syp_new']:,.0f} ` ل.س\n"
+                f"• **أونصة الذهب:** مبيع **`$ {g['oz_sell']:,}`** 🟢 | شراء **`$ {g['oz_buy']:,}`** 🔴\n"
+                f"• **غرام عيار 24:** مبيع **`$ {g['g24_sell']}`** 🟢 | شراء **`$ {g['g24_buy']}`** 🔴\n"
+                f"• **غرام عيار 21:** مبيع **`$ {g['g21_sell']}`** 🟢 | شراء **`$ {g['g21_buy']}`** 🔴\n"
+                f"• **غرام عيار 18:** مبيع **`$ {g['g18_sell']}`** 🟢 | شراء **`$ {g['g18_buy']}`** 🔴\n"
+                f"• **غرام 21 🇸🇾:** **`{d['gold_21_syp_new']:,.0f}`** ل.س\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 "👇 *اضغط على زر الحاسبة أدناه لحساب غراماتك المحددة بالليرة والدولار:*"
             )
@@ -489,9 +489,9 @@ def webhook():
                 reply = (
                     f"🪙 **نتيجة حساب وزن الذهب ({grams} غرام - عيار 21):**\n"
                     "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"• **القيمة الإجمالية بالدولار:** `$ {total_usd:,.2f}`\n"
-                    f"• **القيمة بالليرة الجديدة:** ` {total_new:,.2f} ` ل.س\n"
-                    f"• **القيمة بالليرة القديمة:** ` {total_old:,} ` ل.س\n"
+                    f"• **القيمة الإجمالية بالدولار:** **`$ {total_usd:,.2f}`**\n"
+                    f"• **القيمة بالليرة الجديدة 🇸🇾:** **`{total_new:,.2f}`** ل.س\n"
+                    f"• **القيمة بالليرة القديمة 🇸🇾:** **`{total_old:,}`** ل.س\n"
                     "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                     "*(تم إرجاعك للقائمة الرئيسية تلقائياً)*"
                 )
@@ -510,23 +510,23 @@ def webhook():
             if mode == "usd_syp":
                 res_new = amount * rate_new
                 res_old = int(res_new * 100)
-                reply = f"💵 **حساب التحويل ({amount:,.2f} دولار أمريكي):**\n• بالليرة الجديدة: ` {res_new:,.2f} ` ل.س\n• بالليرة القديمة: ` {res_old:,} ` ل.س"
+                reply = f"💵 **حساب التحويل ({amount:,.2f} دولار أمريكي):**\n• بالليرة الجديدة 🇸🇾: **`{res_new:,.2f}`** ل.س\n• بالليرة القديمة 🇸🇾: **`{res_old:,}`** ل.س"
             elif mode == "syp_usd":
                 usd_val = amount / (rate_new * 100) if amount >= 2000 else amount / rate_new
-                reply = f"🇸🇾 **حساب التحويل ({amount:,.0f} ليرة سورية):**\n💵 القيمة بالدولار: **` {usd_val:,.2f} ` دولار**"
+                reply = f"🇸🇾 **حساب التحويل ({amount:,.0f} ليرة سورية):**\n💵 القيمة بالدولار: **`{usd_val:,.2f}`** دولار"
             elif mode == "try_syp":
                 try_in_syp = rate_new / d["try_sell"]
                 res_new = amount * try_in_syp
                 res_old = int(res_new * 100)
-                reply = f"🇹🇷 **حساب التحويل ({amount:,.2f} ليرة تركية):**\n• بالليرة الجديدة: ` {res_new:,.2f} ` ل.س\n• بالليرة القديمة: ` {res_old:,} ` ل.س"
+                reply = f"🇹🇷 **حساب التحويل ({amount:,.2f} ليرة تركية):**\n• بالليرة الجديدة 🇸🇾: **`{res_new:,.2f}`** ل.س\n• بالليرة القديمة 🇸🇾: **`{res_old:,}`** ل.س"
             elif mode == "eur_syp":
                 eur_in_syp = rate_new * 1.10
                 res_new = amount * eur_in_syp
                 res_old = int(res_new * 100)
-                reply = f"🇪🇺 **حساب التحويل ({amount:,.2f} يورو):**\n• بالليرة الجديدة: ` {res_new:,.2f} ` ل.س\n• بالليرة القديمة: ` {res_old:,} ` ل.س"
+                reply = f"🇪🇺 **حساب التحويل ({amount:,.2f} يورو):**\n• بالليرة الجديدة 🇸🇾: **`{res_new:,.2f}`** ل.س\n• بالليرة القديمة 🇸🇾: **`{res_old:,}`** ل.س"
             else:
                 res_new = amount * rate_new
-                reply = f"💵 **النتيجة:** ` {res_new:,.2f} ` ل.س جديد"
+                reply = f"💵 **النتيجة:** **`{res_new:,.2f}`** ل.س جديد"
 
             user_mode[uid] = "usd_syp"
             bot.send_message(cid, f"{reply}\n\n*(تم إرجاعك للقائمة الرئيسية تلقائياً)*", parse_mode="Markdown")
