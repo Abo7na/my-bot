@@ -22,10 +22,10 @@ def get_all_prices():
         "syp_buy_new": custom_syp["buy"],
         "syp_sell_new": custom_syp["sell"],
         "syp_official_new": custom_syp["official"],
-        "try_rate": 2.94,
-        "eur_usd": 163.00,
-        "egp_rate": 2.75,
-        "sar_rate": 39.45,
+        "try_buy": 2.92, "try_sell": 2.94,
+        "kwd_buy": 0.30, "kwd_sell": 0.31,
+        "aed_buy": 3.65, "aed_sell": 3.67,
+        "sar_buy": 39.20, "sar_sell": 39.45,
         "gold_oz": 3900.0,
         "change_pct": "0.34%+",
         "time_str": time.strftime("%H:%M (%d/%m)")
@@ -38,13 +38,21 @@ def get_all_prices():
         if r.status_code == 200:
             usd = r.json().get("usd", {})
             if usd.get("try"):
-                data["try_rate"] = round(float(usd["try"]), 2)
-            if usd.get("eur"):
-                data["eur_usd"] = round(float(usd["eur"]), 2)
-            if usd.get("egp"):
-                data["egp_rate"] = round(float(usd["egp"]), 2)
+                val = float(usd["try"])
+                data["try_sell"] = round(val, 2)
+                data["try_buy"] = round(val - 0.02, 2)
+            if usd.get("kwd"):
+                val = float(usd["kwd"])
+                data["kwd_sell"] = round(val, 2)
+                data["kwd_buy"] = round(val - 0.01, 2)
+            if usd.get("aed"):
+                val = float(usd["aed"])
+                data["aed_sell"] = round(val, 2)
+                data["aed_buy"] = round(val - 0.02, 2)
             if usd.get("sar"):
-                data["sar_rate"] = round(float(usd["sar"]), 2)
+                val = float(usd["sar"])
+                data["sar_sell"] = round(val, 2)
+                data["sar_buy"] = round(val - 0.25, 2)
             if usd.get("xau"):
                 data["gold_oz"] = round(1 / float(usd["xau"]), 2)
     except Exception:
@@ -88,7 +96,7 @@ def main_keyboard(bot_username=""):
     markup.add(
         types.InlineKeyboardButton("🔄 تحديث النشرة الآن", callback_data="refresh"),
         types.InlineKeyboardButton("🧮 حاسبة العملات التفاعلية", callback_data="calc_menu"),
-        types.InlineKeyboardButton("🪙 أسعار وحاسبة الذهب", callback_data="gold_menu"),
+        types.InlineKeyboardButton("🪙 أسعار الذهب المفصلة", callback_data="gold_menu"),
         types.InlineKeyboardButton("🔔 ضبط منبّه الأسعار", callback_data="set_alert"),
         types.InlineKeyboardButton("📩 التواصل مع الإدارة والدعم", callback_data="contact_admin"),
         types.InlineKeyboardButton("💝 دعم وتطوير البوت", callback_data="support_bot"),
@@ -104,34 +112,28 @@ def back_home_keyboard():
 
 def format_bulletin(d, updated=False):
     header = "🌟 **منصة سوريا كاش الاقتصادية** 🌟"
-    sub = "📊 *(نشرة محدثة للأسعار اللحظية في السوق السوري)*" if updated else "📊 *(النشرة الرسمية لأسعار العملات والذهب)*"
+    sub = "📊 *(نشرة محدثة للأسعار اللحظية في السوق السوري)*" if updated else "📊 *(النشرة الرسمية المباشرة للعملات)*"
     buy_old = int(d["syp_buy_new"] * 100)
     sell_old = int(d["syp_sell_new"] * 100)
-    g = d["gold"]
     
     return (
         f"{header}\n"
         f"{sub}\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         "🇺🇸 **سعر الدولار الأمريكي (السوق المتداول):**\n"
-        f"  ▪️ **مبيع:** ` {d['syp_sell_new']:.2f} ` ل.س  *( `{sell_old:,}` قديمة )*\n"
-        f"  ▪️ **شراء:** ` {d['syp_buy_new']:.2f} ` ل.س  *( `{buy_old:,}` قديمة )*\n"
-        f"  🟢 *حالة السوق: مباشر ({d['time_str']}) | {d['change_pct']} 📈*\n\n"
+        f"  ▪️ **مبيع:** ` {d['syp_sell_new']:.2f} ` 🟢 ل.س  *( `{sell_old:,}` قديمة )*\n"
+        f"  ▪️ **شراء:** ` {d['syp_buy_new']:.2f} ` 🔴 ل.س  *( `{buy_old:,}` قديمة )*\n"
+        f"  🟢 *مباشر ({d['time_str']}) | {d['change_pct']} 📈*\n\n"
         "🏛 **سعر الدولار الرسمي (مصرف سوريا المركزي):**\n"
-        f"  ▪️ **السعر المعتمد:** ` {d['syp_official_new']:.2f} ` ل.س\n"
+        f"  ▪️ **السعر:** ` {d['syp_official_new']:.2f} ` 🟢 ل.س\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "🌍 **أسعار العملات العربية والأجنبية:**\n"
-        f"  🇪🇺 اليورو (EUR): `{d['eur_usd']}`   |   🇹🇷 التركي (TRY): `{d['try_rate']}`\n"
-        f"  🇸🇦 السعودي (SAR): `{d['sar_rate']}`   |   🇪🇬 المصري (EGP): `{d['egp_rate']}`\n"
+        "💱 **أسعار العملات (مبيع وشراء مقابل الدولار):**\n"
+        f"  🇹🇷 **الليرة التركية:** مبيع `{d['try_sell']}` 🟢 | شراء `{d['try_buy']}` 🔴\n"
+        f"  🇰🇼 **الدينار الكويتي:** مبيع `{d['kwd_sell']}` 🟢 | شراء `{d['kwd_buy']}` 🔴\n"
+        f"  🇦🇪 **الدرهم الإماراتي:** مبيع `{d['aed_sell']}` 🟢 | شراء `{d['aed_buy']}` 🔴\n"
+        f"  🇸🇦 **الريال السعودي:** مبيع `{d['sar_sell']}` 🟢 | شراء `{d['sar_buy']}` 🔴\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "🪙 **أسعار الذهب العالمية (بالدولار الأمريكي فقط):**\n"
-        f"  🔸 **أونصة الذهب:** مبيع `$ {g['oz_sell']:,}` | شراء `$ {g['oz_buy']:,}`\n"
-        f"  🔸 **غرام 24:** مبيع `$ {g['g24_sell']}` | شراء `$ {g['g24_buy']}`\n"
-        f"  🔸 **غرام 21:** مبيع `$ {g['g21_sell']}` | شراء `$ {g['g21_buy']}`\n"
-        f"  🔸 **غرام 18:** مبيع `$ {g['g18_sell']}` | شراء `$ {g['g18_buy']}`\n"
-        f"  📍 *غرام 21 (بالليرة السورية):* ` {d['gold_21_syp_new']:,.0f} ` ل.س\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "💡 *اختر من الأزرار أدناه للبدء فوراً:*"
+        "💡 *ساهم في استمرار وتطوير البوت عبر مشاركته مع أصدقائك في المجموعات والرسائل!*"
     )
 
 def check_and_trigger_alerts(bot, current_sell):
@@ -300,12 +302,13 @@ def webhook():
                 types.InlineKeyboardButton("🏠 العودة للقائمة الرئيسية", callback_data="refresh")
             )
             gold_info = (
-                "🪙 **المرجع الشامل لأسعار الذهب (بالدولار الأمريكي)**\n"
+                "🪙 **المرجع الشامل لأسعار الذهب (مبيع وشراء بالدولار الأمريكي)**\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"• **أونصة الذهب:** مبيع `$ {g['oz_sell']:,}` | شراء `$ {g['oz_buy']:,}`\n"
-                f"• **غرام عيار 24:** مبيع `$ {g['g24_sell']}` | شراء `$ {g['g24_buy']}`\n"
-                f"• **غرام عيار 21:** مبيع `$ {g['g21_sell']}` | شراء `$ {g['g21_buy']}`\n"
-                f"• **غرام عيار 18:** مبيع `$ {g['g18_sell']}` | شراء `$ {g['g18_buy']}`\n"
+                f"• **أونصة الذهب:** مبيع `$ {g['oz_sell']:,}` 🟢 | شراء `$ {g['oz_buy']:,}` 🔴\n"
+                f"• **غرام عيار 24:** مبيع `$ {g['g24_sell']}` 🟢 | شراء `$ {g['g24_buy']}` 🔴\n"
+                f"• **غرام عيار 21:** مبيع `$ {g['g21_sell']}` 🟢 | شراء `$ {g['g21_buy']}` 🔴\n"
+                f"• **غرام عيار 18:** مبيع `$ {g['g18_sell']}` 🟢 | شراء `$ {g['g18_buy']}` 🔴\n"
+                f"• **غرام 21 (بالسوري):** ` {d['gold_21_syp_new']:,.0f} ` ل.س\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 "👇 *اضغط على زر الحاسبة أدناه لحساب غراماتك المحددة بالليرة والدولار:*"
             )
@@ -512,12 +515,12 @@ def webhook():
                 usd_val = amount / (rate_new * 100) if amount >= 2000 else amount / rate_new
                 reply = f"🇸🇾 **حساب التحويل ({amount:,.0f} ليرة سورية):**\n💵 القيمة بالدولار: **` {usd_val:,.2f} ` دولار**"
             elif mode == "try_syp":
-                try_in_syp = rate_new / d["try_rate"]
+                try_in_syp = rate_new / d["try_sell"]
                 res_new = amount * try_in_syp
                 res_old = int(res_new * 100)
                 reply = f"🇹🇷 **حساب التحويل ({amount:,.2f} ليرة تركية):**\n• بالليرة الجديدة: ` {res_new:,.2f} ` ل.س\n• بالليرة القديمة: ` {res_old:,} ` ل.س"
             elif mode == "eur_syp":
-                eur_in_syp = rate_new * (d["eur_usd"] / 100.0) if d["eur_usd"] > 10 else rate_new * d["eur_usd"]
+                eur_in_syp = rate_new * 1.10
                 res_new = amount * eur_in_syp
                 res_old = int(res_new * 100)
                 reply = f"🇪🇺 **حساب التحويل ({amount:,.2f} يورو):**\n• بالليرة الجديدة: ` {res_new:,.2f} ` ل.س\n• بالليرة القديمة: ` {res_old:,} ` ل.س"
