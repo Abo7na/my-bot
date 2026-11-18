@@ -97,11 +97,9 @@ def main_keyboard(bot_username=""):
         types.InlineKeyboardButton("🔄 تحديث النشرة الآن", callback_data="refresh"),
         types.InlineKeyboardButton("🧮 حاسبة العملات التفاعلية", callback_data="calc_menu"),
         types.InlineKeyboardButton("🪙 أسعار الذهب المفصلة", callback_data="gold_menu"),
-        types.InlineKeyboardButton("🔔 ضبط منبّه الأسعار", callback_data="set_alert"),
-        types.InlineKeyboardButton("📩 التواصل مع الإدارة والدعم", callback_data="contact_admin"),
-        types.InlineKeyboardButton("💝 دعم وتطوير البوت", callback_data="support_bot"),
-        types.InlineKeyboardButton("📢 قناة التليجرام الرسمية", url=CHANNEL_URL),
-        types.InlineKeyboardButton("📤 مشاركة البوت مع الأصدقاء", url=share_url)
+        types.InlineKeyboardButton("📤 مشاركة البوت مع الأصدقاء", url=share_url),
+        types.InlineKeyboardButton("⚙️ خدمات إضافية أخرى", callback_data="more_services"),
+        types.InlineKeyboardButton("📢 قناة التليجرام الرسمية", url=CHANNEL_URL)
     )
     return markup
 
@@ -128,10 +126,10 @@ def format_bulletin(d, updated=False):
         f"  ▪️ **السعر:** **`{d['syp_official_new']:.2f}`** 🟢 ل.س\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         "💱 **أسعار العملات (مبيع وشراء):**\n"
-        f"  🇹🇷 **تركيا:** مبيع **`{d['try_sell']}`** 🟢 | شراء **`{d['try_buy']}`** 🔴\n"
-        f"  🇰🇼 **الكويت:** مبيع **`{d['kwd_sell']}`** 🟢 | شراء **`{d['kwd_buy']}`** 🔴\n"
-        f"  🇦🇪 **الإمارات:** مبيع **`{d['aed_sell']}`** 🟢 | شراء **`{d['aed_buy']}`** 🔴\n"
-        f"  🇸🇦 **السعودية:** مبيع **`{d['sar_sell']}`** 🟢 | شراء **`{d['sar_buy']}`** 🔴\n"
+        f"  🇹🇷 **مبيع:** **`{d['try_sell']}`** 🟢 | **شراء:** **`{d['try_buy']}`** 🔴\n"
+        f"  🇰🇼 **مبيع:** **`{d['kwd_sell']}`** 🟢 | **شراء:** **`{d['kwd_buy']}`** 🔴\n"
+        f"  🇦🇪 **مبيع:** **`{d['aed_sell']}`** 🟢 | **شراء:** **`{d['aed_buy']}`** 🔴\n"
+        f"  🇸🇦 **مبيع:** **`{d['sar_sell']}`** 🟢 | **شراء:** **`{d['sar_buy']}`** 🔴\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         "💡 *شارك **سوريا كاش - Syria Cash** مع أصدقائك وفي المجموعات ليصلك كل جديد لحظة بلحظة!*"
     )
@@ -325,6 +323,17 @@ def webhook():
             markup = types.InlineKeyboardMarkup()
             markup.add(types.InlineKeyboardButton("❌ إلغاء وعودة للقائمة", callback_data="refresh"))
             bot.send_message(cid, "🪙 **حاسبة وزن الذهب الذكية**\n\nأرسل الآن عدد غرامات الذهب المطلوبة لعيار 21 (مثلاً: `5` أو `10`):", parse_mode="Markdown", reply_markup=markup)
+            bot.answer_callback_query(call.id)
+
+        elif call.data == "more_services":
+            markup = types.InlineKeyboardMarkup(row_width=1)
+            markup.add(
+                types.InlineKeyboardButton("🔔 ضبط منبّه الأسعار", callback_data="set_alert"),
+                types.InlineKeyboardButton("📩 التواصل مع الإدارة والدعم", callback_data="contact_admin"),
+                types.InlineKeyboardButton("💝 دعم وتطوير البوت", callback_data="support_bot"),
+                types.InlineKeyboardButton("🏠 العودة للقائمة الرئيسية", callback_data="refresh")
+            )
+            bot.edit_message_text("⚙️ **الخدمات الإضافية - سوريا كاش**\n\nاختر الخدمة المطلوبة من القائمة أدناه:", cid, call.message.message_id, parse_mode="Markdown", reply_markup=markup)
             bot.answer_callback_query(call.id)
 
         elif call.data == "set_alert":
