@@ -7,12 +7,12 @@ from telebot import types
 app = Flask(__name__)
 
 def get_rates():
-    session = requests.Session()
-    headers = {"User-Agent": "TelegramBot/1.0"}
-    
-    # مصدر 1: البنك المركزي الأوروبي (مفتوح وموثوق 100% ولا يرفض Vercel)
     try:
-        r = session.get("https://frankfurter.app", headers=headers, timeout=5)
+        # تجميع الرابط برمجياً لمنع المتصفح من قصه أثناء النسخ
+        host = "api." + "frankfurter" + ".app"
+        url = "https://" + host + "/latest?from=USD"
+        
+        r = requests.get(url, timeout=5)
         if r.status_code == 200:
             rates = r.json().get("rates", {})
             return {
@@ -22,9 +22,9 @@ def get_rates():
                 "CAD": rates.get("CAD", "-"),
                 "AUD": rates.get("AUD", "-")
             }
+        return f"Status: {r.status_code}"
     except Exception as e:
         return f"Err: {str(e)}"
-    return "No data"
 
 @app.route('/', methods=['POST', 'GET'])
 def webhook():
@@ -45,14 +45,14 @@ def webhook():
         markup.add(types.InlineKeyboardButton("🔄 تحديث الأسعار", callback_data="refresh"))
         
         text = (
-            "💱 **أسعار صرف الدولار اليوم (البنك المركزي الأوروبي)**\n"
+            "💱 **أسعار صرف الدولار اليوم**\n"
             "━━━━━━━━━━━━━━━━━━\n"
             f"🇪🇺 **اليورو (EUR):** `{res['EUR']}`\n"
             f"🇹🇷 **الليرة التركية (TRY):** `{res['TRY']}`\n"
             f"🇬🇧 **الجنيه الإسترليني (GBP):** `{res['GBP']}`\n"
             f"🇨🇦 **الدولار الكندي (CAD):** `{res['CAD']}`\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            "💡 *أرسل أي مبلغ بالدولار لتحويله لليرة التركية واليورو!*"
+            "💡 *أرسل أي مبلغ بالدولار لتحويله فوراً!*"
         )
         bot.send_message(message.chat.id, text, parse_mode="Markdown", reply_markup=markup)
 
@@ -102,4 +102,4 @@ def webhook():
         bot.process_new_updates([update])
         return "OK", 200
         
-    return "Frankfurter Bot Running!", 200
+    return "Bot Running!", 200
