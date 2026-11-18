@@ -1,5 +1,4 @@
 import os
-import re
 import requests
 from flask import Flask, request
 import telebot
@@ -7,27 +6,25 @@ from telebot import types
 
 app = Flask(__name__)
 
-# ذاكرة مؤقتة لحفظ وضع التحويل لكل مستخدم
+# ذاكرة مؤقتة لوضع التحويل والسعر المتداول
 user_mode = {}
+custom_syp = {"buy": 149.50, "sell": 150.00, "official": 122.50}
 
 def get_all_prices():
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-    }
     data = {
-        "syp_buy_new": 149.50,
-        "syp_sell_new": 150.00,
-        "syp_official_new": 122.50,
+        "syp_buy_new": custom_syp["buy"],
+        "syp_sell_new": custom_syp["sell"],
+        "syp_official_new": custom_syp["official"],
         "try_rate": 50.40,
         "eur_usd": 1.10,
         "gold_oz": 3900.0
     }
 
-    # 1. جلب الأسعار العالمية وأونصة الذهب (XAU) من شبكة jsDelivr
+    # جلب الأسعار العالمية والذهب من شبكة jsDelivr السريعة جداً (مهلة ثانيتين فقط)
     try:
         host = "cdn." + "jsdelivr" + ".net"
         path = "/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json"
-        r = requests.get("https://" + host + path, timeout=4)
+        r = requests.get("https://" + host + path, timeout=2.5)
         if r.status_code == 200:
             usd = r.json().get("usd", {})
             if usd.get("try"):
@@ -35,28 +32,10 @@ def get_all_prices():
             if usd.get("eur"):
                 data["eur_usd"] = round(1 / float(usd["eur"]), 4)
             if usd.get("xau"):
-                # xau في هذه الواجهة يمثل كم أونصة يساوي الدولار الواحد
                 data["gold_oz"] = round(1 / float(usd["xau"]), 2)
     except Exception:
         pass
 
-    # 2. سحب سعر الدولار المتداول في سوريا مباشرة من موقع الليرة اليوم
-    try:
-        sp_host = "sp-" + "today" + ".com"
-        sp_url = "https://" + sp_host + "/en/currency/us-dollar"
-        resp = requests.get(sp_url, headers=headers, timeout=4)
-        if resp.status_code == 200:
-            html = resp.text
-            # البحث عن أرقام الشراء والمبيع في الصفحة (مثل 149.50 و 150.00)
-            buy_m = re.search(r'Buy\s*([0-9]{2,3}\.[0-9]{2})', html)
-            sell_m = re.search(r'Sell\s*([0-9]{2,3}\.[0-9]{2})', html)
-            if buy_m and sell_m:
-                data["syp_buy_new"] = float(buy_m.group(1))
-                data["syp_sell_new"] = float(sell_m.group(1))
-    except Exception:
-        pass
-
-    # حساب أسعار الذهب بالغرام (عيار 24 و 21)
     gold_24_usd = data["gold_oz"] / 31.1035
     gold_21_usd = gold_24_usd * 0.875
     data["gold_24_usd"] = round(gold_24_usd, 2)
@@ -94,22 +73,22 @@ def format_bulletin(d, updated=False):
     return (
         f"{title}\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        "🇺🇸 **الدولار (السوق المتداول - دمشق):**\n"
+        "🇺🇸 **الدولار (السوق المتداول):**\n"
         f"• شراء: `{d['syp_buy_new']:.2f}` جديدة (`{buy_old:,}` قديمة)\n"
         f"• مبيع: `{d['syp_sell_new']:.2f}` جديدة (`{sell_old:,}` قديمة)\n\n"
         "🏛 **الدولار (النشرة الرسمية):**\n"
         f"• السعر: `{d['syp_official_new']:.2f}` جديدة (`{off_old:,}` قديمة)\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        "🌍 **العملات الأجنبية:**\n"
+        "🌍 **العملات الأجنبية (لحظي):**\n"
         f"• 🇪🇺 اليورو: `{d['eur_usd']}` دولار\n"
         f"• 🇹🇷 الدولار مقابل التركي: `{d['try_rate']}` ليرة\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        "🪙 **أسعار الذهب اللحظية:**\n"
+        "🪙 **أسعار الذهب (لحظي):**\n"
         f"• الأونصة عالمياً: `${d['gold_oz']:,.1f}`\n"
         f"• غرام 24: `${d['gold_24_usd']}` | غرام 21: `${d['gold_21_usd']}`\n"
         f"• غرام 21 (سوري): `{d['gold_21_syp_new']:,.0f}` جديدة (`{d['gold_21_syp_old']:,}` قديمة)\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        "💡 *اضغط على (🧮 حاسبة التحويل) لاختيار نوع التحويل!*"
+        "💡 *اضغط (🧮 حاسبة التحويل) للتحويل بين العملات!*"
     )
 
 @app.route('/', methods=['POST', 'GET'])
@@ -126,6 +105,19 @@ def webhook():
         d = get_all_prices()
         bot.send_message(message.chat.id, format_bulletin(d), parse_mode="Markdown", reply_markup=main_keyboard())
 
+    @bot.message_handler(commands=['set'])
+    def set_rate(message):
+        try:
+            parts = message.text.split()
+            val = float(parts[1])
+            if val > 1000:
+                val = val / 100.0
+            custom_syp["sell"] = val
+            custom_syp["buy"] = round(val - 0.5, 2)
+            bot.reply_to(message, f"✅ تم تحديث سعر الدولار المتداول إلى `{val:.2f}` جديدة (`{int(val*100):,}` قديمة).", parse_mode="Markdown")
+        except Exception:
+            bot.reply_to(message, "اكتب الأمر متبوعاً بالسعر الجديد، مثلاً:\n`/set 150` أو `/set 15000`", parse_mode="Markdown")
+
     @bot.callback_query_handler(func=lambda call: True)
     def handle_callbacks(call):
         cid = call.message.chat.id
@@ -135,7 +127,7 @@ def webhook():
                 bot.edit_message_text(format_bulletin(d, True), cid, call.message.message_id, parse_mode="Markdown", reply_markup=main_keyboard())
             except Exception:
                 pass
-            bot.answer_callback_query(call.id, "✅ تم تحديث الأسعار!")
+            bot.answer_callback_query(call.id, "✅ تم التحديث!")
 
         elif call.data == "calc_menu":
             bot.edit_message_text(
@@ -149,13 +141,13 @@ def webhook():
             user_mode[cid] = mode
             names = {
                 "usd_syp": "🇺🇸 الدولار ⬅️ 🇸🇾 الليرة السورية",
-                "syp_usd": "🇸🇾 الليرة السورية (بالجديدة أو القديمة) ⬅️ 🇺🇸 الدولار",
+                "syp_usd": "🇸🇾 الليرة السورية ⬅️ 🇺🇸 الدولار",
                 "try_syp": "🇹🇷 الليرة التركية ⬅️ 🇸🇾 الليرة السورية",
                 "eur_syp": "🇪🇺 اليورو ⬅️ 🇸🇾 الليرة السورية"
             }
             bot.send_message(
                 cid,
-                f"✅ تم اختيار: **{names.get(mode)}**\n\n✍️ أرسل الآن **المبلغ** الذي تريد تحويله (مثلاً: `100`):",
+                f"✅ تم اختيار: **{names.get(mode)}**\n\n✍️ أرسل الآن **المبلغ** كرقم (مثلاً: `100`):",
                 parse_mode="Markdown"
             )
             bot.answer_callback_query(call.id)
@@ -178,7 +170,6 @@ def webhook():
                     f"• بالليرة القديمة: `{res_old:,}` ل.س"
                 )
             elif mode == "syp_usd":
-                # إذا أدخل المستخدم رقماً كبيراً (أكبر من 2000) نفترض أنه بالليرة القديمة تلقائياً
                 if amount >= 2000:
                     usd_val = amount / (rate_new * 100)
                     label = "ليرة قديمة"
@@ -207,7 +198,7 @@ def webhook():
 
             bot.reply_to(message, reply, parse_mode="Markdown", reply_markup=calc_keyboard())
         except ValueError:
-            bot.reply_to(message, "⚠️ يرجى إدخال رقم صحيح للتحويل (مثلاً: `100`)، أو أرسل `/start` للعودة للقائمة الرئيسية.")
+            bot.reply_to(message, "⚠️ يرجى إدخال رقم صحيح للتحويل (مثلاً: `100`)، أو أرسل `/start` للقائمة الرئيسية.")
 
     if request.method == 'POST':
         json_string = request.get_data().decode('utf-8')
@@ -215,4 +206,4 @@ def webhook():
         bot.process_new_updates([update])
         return "OK", 200
         
-    return "Syria Gold & Currency Bot is Running!", 200
+    return "Fast Syria Gold & Currency Bot is Running!", 200
