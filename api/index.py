@@ -7,14 +7,12 @@ from telebot import types
 
 app = Flask(__name__)
 
-# تخزين مؤقت في الذاكرة (يدعم التشغيل السريع على Vercel)
 user_mode = {}
 custom_syp = {"buy": 149.50, "sell": 150.00, "official": 122.50}
-support_tickets = []  # قائمة رسائل الدعم الواردة من المستخدمين
-subscribers = set()   # المشتركون للإذاعة
-referrals = {}        # تتبع الدعوات: {user_id: count}
-price_alerts = {}     # التنبيهات السعرية: {user_id: target_price}
-reply_target = {}     # لتخزين معرف المستخدم الذي يرد عليه المشرف
+support_tickets = []  
+subscribers = set()   
+price_alerts = {}     
+reply_target = {}     
 
 CHANNEL_USERNAME = "@DCo_Sy"
 CHANNEL_URL = "https://" + "t." + "me/DCo_Sy"
@@ -52,12 +50,30 @@ def get_all_prices():
     except Exception:
         pass
 
-    gold_24_usd = data["gold_oz"] / 31.1035
-    gold_21_usd = gold_24_usd * 0.875
-    data["gold_24_usd"] = round(gold_24_usd, 2)
-    data["gold_21_usd"] = round(gold_21_usd, 2)
-    data["gold_21_syp_new"] = round(gold_21_usd * data["syp_sell_new"], 2)
-    data["gold_21_syp_old"] = int(data["gold_21_syp_new"] * 100)
+    # حساب أسعار الذهب بالدولار فقط (مبيع وشراء افتراضي بفرق بسيط)
+    oz_buy = data["gold_oz"]
+    oz_sell = oz_buy + 5.0
+    
+    g24_buy = oz_buy / 31.1035
+    g24_sell = oz_sell / 31.1035
+    
+    g21_buy = g24_buy * 0.875
+    g21_sell = g24_sell * 0.875
+    
+    g18_buy = g24_buy * 0.750
+    g18_sell = g24_sell * 0.750
+
+    data["gold"] = {
+        "oz_buy": round(oz_buy, 1), "oz_sell": round(oz_sell, 1),
+        "g24_buy": round(g24_buy, 2), "g24_sell": round(g24_sell, 2),
+        "g21_buy": round(g21_buy, 2), "g21_sell": round(g21_sell, 2),
+        "g18_buy": round(g18_buy, 2), "g18_sell": round(g18_sell, 2),
+    }
+
+    # للتقييم السوري القديم للذهب
+    gold_21_syp_new = round(g21_sell * data["syp_sell_new"], 2)
+    data["gold_21_syp_new"] = gold_21_syp_new
+    data["gold_21_syp_old"] = int(gold_21_syp_new * 100)
 
     return data
 
@@ -70,47 +86,57 @@ def check_subscription(bot, user_id):
         pass
     return False
 
-def main_keyboard(bot_username="", user_id=0):
-    ref_link = "https://" + "t." + f"me/{bot_username}?start=ref_{user_id}"
-    share_url = "https://" + "t." + f"me/share/url?url={ref_link}&text=تابع+أسعار+الصرف+والذهب+لحظة+بلحظة+عبر+سوريا+كاش!"
+def main_keyboard(bot_username=""):
+    share_url = "https://" + "t." + f"me/share/url?url=https://t.me/{bot_username}&text=أفضل+منصة+لأسعار+الصرف+والذهب+في+سوريا+-+سوريا+كاش"
     
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton("🔄 تحديث الأسعار", callback_data="refresh"),
-        types.InlineKeyboardButton("🧮 حاسبة العملات", callback_data="calc_menu"),
-        types.InlineKeyboardButton("🪙 حاسبة الذهب", callback_data="gold_calc"),
-        types.InlineKeyboardButton("🔔 ضبط منبّه سعر", callback_data="set_alert"),
-        types.InlineKeyboardButton("📩 تواصل مع المشرف", callback_data="contact_admin"),
+        types.InlineKeyboardButton("🔄 تحديث النشرة الآن", callback_data="refresh"),
+        types.InlineKeyboardButton("🧮 حاسبة العملات التفاعلية", callback_data="calc_menu"),
+        types.InlineKeyboardButton("🪙 أسعار وحاسبة الذهب", callback_data="gold_menu"),
+        types.InlineKeyboardButton("🔔 ضبط منبّه الأسعار", callback_data="set_alert"),
+        types.InlineKeyboardButton("📩 التواصل مع الإدارة والدعم", callback_data="contact_admin"),
         types.InlineKeyboardButton("💝 دعم وتطوير البوت", callback_data="support_bot"),
-        types.InlineKeyboardButton("🏆 رابط الدعوة الخاص", callback_data="my_ref"),
-        types.InlineKeyboardButton("📤 مشاركة النشرة", url=share_url)
+        types.InlineKeyboardButton("📢 قناة التليجرام الرسمية", url=CHANNEL_URL),
+        types.InlineKeyboardButton("📤 مشاركة البوت مع الأصدقاء", url=share_url)
     )
     return markup
 
+def back_home_keyboard():
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("🏠 القائمة الرئيسية والعودة", callback_data="refresh"))
+    return markup
+
 def format_bulletin(d, updated=False):
-    header = "💎 **سوريا كاش - Syria Cash** 💎"
-    sub_header = "*(تحديث لحظي ومباشر لأسعار السوق)*" if updated else "*(نشرة أسعار الصرف والذهب في سوريا)*"
+    header = "🌟 **منصة سوريا كاش الاقتصادية** 🌟"
+    sub = "📊 *(نشرة محدثة للأسعار اللحظية في السوق السوري)*" if updated else "📊 *(النشرة الرسمية لأسعار العملات والذهب)*"
     buy_old = int(d["syp_buy_new"] * 100)
     sell_old = int(d["syp_sell_new"] * 100)
+    g = d["gold"]
     
     return (
         f"{header}\n"
-        f"{sub_header}\n"
-        "╔════════════════════╗\n"
-        "🇺🇸 **الدولار الأمريكي (سوريا - عام)**\n"
-        f"🔹 **مبيع:** `{d['syp_sell_new']:.2f}` ل.س  |  (`{sell_old:,}` قديمة)\n"
-        f"🔸 **شراء:** `{d['syp_buy_new']:.2f}` ل.س  |  (`{buy_old:,}` قديمة)\n"
-        f"📡 الحالة: مباشر 🟢 `{d['time_str']}` ({d['change_pct']})\n"
-        "╠════════════════════╣\n"
-        "🌍 **أسعار العملات مقابل الدولار:**\n"
-        f"🇪🇺 **اليورو (EUR):** `{d['eur_usd']}`   |   🇹🇷 **التركي (TRY):** `{d['try_rate']}`\n"
-        f"🇸🇦 **السعودي (SAR):** `{d['sar_rate']}`   |   🇪🇬 **المصري (EGP):** `{d['egp_rate']}`\n"
-        "╠════════════════════╣\n"
-        "🪙 **نشرة الذهب (لحظي):**\n"
-        f"✨ **الأونصة عالمياً:** `${d['gold_oz']:,.1f}`\n"
-        f"🏅 **غرام 21 (سوري):** `{d['gold_21_syp_new']:,.0f}` جديدة (`{d['gold_21_syp_old']:,}` قديمة)\n"
-        "╚════════════════════╝\n"
-        "👇 *استخدم الأزرار التفاعلية أدناه للتحويل والتنبيهات:*"
+        f"{sub}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "🇺🇸 **سعر الدولار الأمريكي (السوق المتداول):**\n"
+        f"  ▪️ **مبيع:** ` {d['syp_sell_new']:.2f} ` ل.س  *( `{sell_old:,}` قديمة )*\n"
+        f"  ▪️ **شراء:** ` {d['syp_buy_new']:.2f} ` ل.س  *( `{buy_old:,}` قديمة )*\n"
+        f"  🟢 *حالة السوق: مباشر ({d['time_str']}) | {d['change_pct']} 📈*\n\n"
+        "🏛 **سعر الدولار الرسمي (مصرف سوريا المركزي):**\n"
+        f"  ▪️ **السعر المعتمد:** ` {d['syp_official_new']:.2f} ` ل.س\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "🌍 **أسعار العملات العربية والأجنبية:**\n"
+        f"  🇪🇺 اليورو (EUR): `{d['eur_usd']}`   |   🇹🇷 التركي (TRY): `{d['try_rate']}`\n"
+        f"  🇸🇦 السعودي (SAR): `{d['sar_rate']}`   |   🇪🇬 المصري (EGP): `{d['egp_rate']}`\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "🪙 **أسعار الذهب العالمية (بالدولار الأمريكي فقط):**\n"
+        f"  🔸 **أونصة الذهب:** مبيع `$ {g['oz_sell']:,}` | شراء `$ {g['oz_buy']:,}`\n"
+        f"  🔸 **غرام 24:** مبيع `$ {g['g24_sell']}` | شراء `$ {g['g24_buy']}`\n"
+        f"  🔸 **غرام 21:** مبيع `$ {g['g21_sell']}` | شراء `$ {g['g21_buy']}`\n"
+        f"  🔸 **غرام 18:** مبيع `$ {g['g18_sell']}` | شراء `$ {g['g18_buy']}`\n"
+        f"  📍 *غرام 21 (بالليرة السورية):* ` {d['gold_21_syp_new']:,.0f} ` ل.س\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "💡 *اختر من الأزرار أدناه للبدء فوراً:*"
     )
 
 def check_and_trigger_alerts(bot, current_sell):
@@ -120,7 +146,7 @@ def check_and_trigger_alerts(bot, current_sell):
             try:
                 bot.send_message(
                     uid,
-                    f"🔔 **تنبيه سعري من سوريا كاش!**\n\nوصل سعر مبيع الدولار الآن إلى **`{current_sell:.2f}`** ل.س (تجاوز السعر الذي حددته: `{target}`).",
+                    f"🚨 **تنبيه هام من سوريا كاش!**\n\nلقد وصل سعر مبيع الدولار الآن في السوق إلى **`{current_sell:.2f}`** ل.س، وهو السعر المستهدف الذي طالبت بتنبيهك عند وصوله (`{target}`).",
                     parse_mode="Markdown"
                 )
                 triggered_users.append(uid)
@@ -141,33 +167,27 @@ def webhook():
     except Exception:
         bot_username = "SyriaCashBot"
 
-    # دعم النشر التلقائي عبر الرابط /?cron=publish
     if request.method == 'GET' and request.args.get('cron') == 'publish':
         d = get_all_prices()
-        share_url = "https://" + "t." + f"me/share/url?url=https://t.me/{bot_username}&text=نشرة+سوريا+كاش+لأسعار+الصرف"
         markup = types.InlineKeyboardMarkup()
-        markup.add(
-            types.InlineKeyboardButton("🤖 افتح البوت والحاسبة", url="https://" + "t." + f"me/{bot_username}"),
-            types.InlineKeyboardButton("📤 مشاركة النشرة", url=share_url)
-        )
+        markup.add(types.InlineKeyboardButton("🤖 افتح بوت سوريا كاش للحاسبة والخدمات", url="https://" + "t." + f"me/{bot_username}"))
         try:
             bot.send_message(CHANNEL_USERNAME, format_bulletin(d, True), parse_mode="Markdown", reply_markup=markup)
             return "Published to channel successfully!", 200
         except Exception as e:
             return f"Error publishing: {e}", 500
 
-    # تفعيل ميزة البحث السريع (Inline Mode) لانتشار البوت في المجموعات
     @bot.inline_handler(lambda query: True)
     def inline_query_handler(inline_query):
         d = get_all_prices()
         text = format_bulletin(d, True)
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🤖 الدخول لبوت سوريا كاش", url="https://" + "t." + f"me/{bot_username}"))
+        markup.add(types.InlineKeyboardButton("🤖 افتح بوت سوريا كاش", url="https://" + "t." + f"me/{bot_username}"))
         
         r1 = types.InlineQueryResultArticle(
             id='1',
             title=f"💵 سعر الدولار الآن: {d['syp_sell_new']:.2f} ل.س",
-            description="اضغط لإرسال نشرة سوريا كاش الكاملة في هذه الدردشة",
+            description="انقر لإرسال النشرة الاقتصادية الكاملة في هذه الدردشة",
             input_message_content=types.InputTextMessageContent(text, parse_mode="Markdown"),
             reply_markup=markup
         )
@@ -176,27 +196,15 @@ def webhook():
     @bot.message_handler(commands=['start', 'prices'])
     def send_welcome(message):
         uid = message.from_user.id
-        
-        # تسجيل الدعوة (Referral) إذا دخل المستخدم عبر رابط صديق
-        parts = message.text.split()
-        if len(parts) > 1 and parts[1].startswith("ref_"):
-            try:
-                inviter_id = int(parts[1].replace("ref_", ""))
-                if inviter_id != uid and uid not in subscribers:
-                    referrals[inviter_id] = referrals.get(inviter_id, 0) + 1
-            except Exception:
-                pass
-
         subscribers.add(uid)
         
-        # التحقق من الاشتراك الإجباري
         if not check_subscription(bot, uid):
             markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("📢 اشترك في قناة سوريا كاش", url=CHANNEL_URL))
-            markup.add(types.InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_sub"))
+            markup.add(types.InlineKeyboardButton("📢 الانضمام لقناة سوريا كاش", url=CHANNEL_URL))
+            markup.add(types.InlineKeyboardButton("✅ لقد اشتركت، تحقق الآن", callback_data="check_sub"))
             bot.send_message(
                 message.chat.id,
-                "⚠️ **عذراً عزيزي المستخدم!**\n\nيجب عليك الاشتراك في قناتنا الرسمية أولاً لتتمكن من استخدام بوت **سوريا كاش** والحصول على الأسعار والحاسبة مجاناً:\n\n🔗 " + CHANNEL_URL,
+                "⚠️ **عذراً، اشترك في القناة أولاً لتستمتع بخدمات البوت:**\n\nنرحّب بك في **سوريا كاش**، يرجى الانضمام للقناة الرسمية لتفعيل حسابك:\n\n🔗 " + CHANNEL_URL,
                 parse_mode="Markdown",
                 reply_markup=markup
             )
@@ -204,22 +212,22 @@ def webhook():
 
         user_mode[uid] = "usd_syp"
         d = get_all_prices()
-        bot.send_message(message.chat.id, format_bulletin(d), parse_mode="Markdown", reply_markup=main_keyboard(bot_username, uid))
+        bot.send_message(message.chat.id, format_bulletin(d), parse_mode="Markdown", reply_markup=main_keyboard(bot_username))
 
-    # لوحة تحكم المشرف المحمية بكلمة المرور
     @bot.message_handler(commands=['asmaa1993'])
     def admin_panel(message):
         unread = len(support_tickets)
         markup = types.InlineKeyboardMarkup(row_width=1)
         markup.add(
             types.InlineKeyboardButton(f"📩 قراءة رسائل الدعم الواردة ({unread})", callback_data="admin_read_tickets"),
-            types.InlineKeyboardButton("📢 إرسال إذاعة عامة للمشتركين", callback_data="admin_broadcast"),
-            types.InlineKeyboardButton("📤 نشر النشرة الآن في القناة", callback_data="admin_force_post"),
-            types.InlineKeyboardButton("📊 إحصائيات النمو والمشتركين", callback_data="admin_stats")
+            types.InlineKeyboardButton("📢 إرسال اذاعة عامة للمستخدمين", callback_data="admin_broadcast"),
+            types.InlineKeyboardButton("📤 نشر النشرة الفورية في القناة", callback_data="admin_force_post"),
+            types.InlineKeyboardButton("📊 إحصائيات المشتركين والنشاط", callback_data="admin_stats"),
+            types.InlineKeyboardButton("🏠 العودة للقائمة الرئيسية", callback_data="refresh")
         )
         bot.send_message(
             message.chat.id,
-            "🔐 **لوحة تحكم الإدارة - سوريا كاش**\n\nمرحباً بك أيها المشرف، اختر الإجراء المطلوب:",
+            "🔐 **لوحة تحكم المشرف الرئيسية - سوريا كاش**\n\nأهلاً بك، يرجى اختيار العملية المطلوبة:",
             parse_mode="Markdown",
             reply_markup=markup
         )
@@ -237,9 +245,9 @@ def webhook():
             custom_syp["sell"] = val
             custom_syp["buy"] = round(val - 0.5, 2)
             check_and_trigger_alerts(bot, val)
-            bot.reply_to(message, f"✅ تم تحديث سعر الدولار في **سوريا كاش** إلى `{val:.2f}` جديدة (`{int(val*100):,}` قديمة).", parse_mode="Markdown")
+            bot.reply_to(message, f"✅ تم تحديث سعر صرف الدولار بنجاح إلى `{val:.2f}` جديدة (`{int(val*100):,}` قديمة).", parse_mode="Markdown", reply_markup=back_home_keyboard())
         except Exception:
-            bot.reply_to(message, "اكتب الأمر متبوعاً بالسعر الجديد، مثلاً:\n`/set 150` أو `/set 15000`", parse_mode="Markdown")
+            bot.reply_to(message, "⚠️ صيغة الأمر غير صحيحة. اكتب الأمر متبوعاً بالسعر الجديد، مثلاً:\n`/set 150` أو `/set 15000`", parse_mode="Markdown", reply_markup=back_home_keyboard())
 
     @bot.callback_query_handler(func=lambda call: True)
     def handle_callbacks(call):
@@ -248,99 +256,121 @@ def webhook():
 
         if call.data == "check_sub":
             if check_subscription(bot, uid):
-                bot.answer_callback_query(call.id, "✅ شكراً لاشتراكك! تم تفعيل البوت.")
+                bot.answer_callback_query(call.id, "✅ تم التحقق من اشتراكك بنجاح! أهلاً بك.")
                 d = get_all_prices()
-                bot.edit_message_text(format_bulletin(d), cid, call.message.message_id, parse_mode="Markdown", reply_markup=main_keyboard(bot_username, uid))
+                bot.edit_message_text(format_bulletin(d), cid, call.message.message_id, parse_mode="Markdown", reply_markup=main_keyboard(bot_username))
             else:
-                bot.answer_callback_query(call.id, "❌ لم تشترك في القناة بعد! اشترك ثم اضغط تحقق.", show_alert=True)
+                bot.answer_callback_query(call.id, "❌ لم تقم بالاشتراك في القناة بعد! يرجى الاشتراك أولاً.", show_alert=True)
             return
 
         if not check_subscription(bot, uid):
-            bot.answer_callback_query(call.id, "⚠️ يرجى الاشتراك في القناة أولاً!", show_alert=True)
+            bot.answer_callback_query(call.id, "⚠️ يجب الاشتراك في القناة المخصصة أولاً!", show_alert=True)
             return
 
         if call.data == "refresh":
+            user_mode[uid] = "usd_syp"
             d = get_all_prices()
             try:
-                bot.edit_message_text(format_bulletin(d, True), cid, call.message.message_id, parse_mode="Markdown", reply_markup=main_keyboard(bot_username, uid))
+                bot.edit_message_text(format_bulletin(d, True), cid, call.message.message_id, parse_mode="Markdown", reply_markup=main_keyboard(bot_username))
             except Exception:
-                pass
-            bot.answer_callback_query(call.id, "✅ تم تحديث النشرة!")
+                bot.send_message(cid, format_bulletin(d, True), parse_mode="Markdown", reply_markup=main_keyboard(bot_username))
+            bot.answer_callback_query(call.id, "✅ تم تحديث النشرة بنجاح")
 
         elif call.data == "calc_menu":
             markup = types.InlineKeyboardMarkup(row_width=2)
             markup.add(
-                types.InlineKeyboardButton("🇺🇸 دولار ⬅️ 🇸🇾 سوري", callback_data="mode_usd_syp"),
-                types.InlineKeyboardButton("🇸🇾 سوري ⬅️ 🇺🇸 دولار", callback_data="mode_syp_usd"),
-                types.InlineKeyboardButton("🇹🇷 تركي ⬅️ 🇸🇾 سوري", callback_data="mode_try_syp"),
-                types.InlineKeyboardButton("🇪🇺 يورو ⬅️ 🇸🇾 سوري", callback_data="mode_eur_syp"),
-                types.InlineKeyboardButton("🔙 العودة للنشرة", callback_data="refresh")
+                types.InlineKeyboardButton("🇺🇸 دولار ⬅️ 🇸🇾 ليرة سورية", callback_data="mode_usd_syp"),
+                types.InlineKeyboardButton("🇸🇾 ليرة سورية ⬅️ 🇺🇸 دولار", callback_data="mode_syp_usd"),
+                types.InlineKeyboardButton("🇹🇷 ليرة تركية ⬅️ 🇸🇾 سوري", callback_data="mode_try_syp"),
+                types.InlineKeyboardButton("🇪🇺 يورو ⬅️ 🇸🇾 ليرة سورية", callback_data="mode_eur_syp"),
+                types.InlineKeyboardButton("🏠 العودة للقائمة الرئيسية", callback_data="refresh")
             )
-            bot.edit_message_text("🧮 **حاسبة العملات التفاعلية - سوريا كاش**\n\nاختر اتجاه التحويل المطلوب من الأسفل:", cid, call.message.message_id, parse_mode="Markdown", reply_markup=markup)
+            bot.edit_message_text("🧮 **حاسبة العملات الذكية والتفاعلية**\n\nاختر اتجاه التحويل المفضل لديك من الأزرار أدناه:", cid, call.message.message_id, parse_mode="Markdown", reply_markup=markup)
             bot.answer_callback_query(call.id)
 
         elif call.data.startswith("mode_"):
             mode = call.data.replace("mode_", "")
             user_mode[uid] = mode
-            bot.send_message(cid, "✍️ أرسل الآن **المبلغ** كرقم فقط (مثلاً: `100`):", parse_mode="Markdown")
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("❌ إلغاء وعودة للقائمة", callback_data="refresh"))
+            bot.send_message(cid, "✍️ أرسل الآن **المبلغ المراد تحويله** كرقم فقط (مثلاً: `100` أو `5000`):", parse_mode="Markdown", reply_markup=markup)
             bot.answer_callback_query(call.id)
 
-        elif call.data == "gold_calc":
+        elif call.data == "gold_menu":
+            d = get_all_prices()
+            g = d["gold"]
+            markup = types.InlineKeyboardMarkup(row_width=2)
+            markup.add(
+                types.InlineKeyboardButton("⚖️ حاسبة وزن وسعر الذهب", callback_data="gold_calc_start"),
+                types.InlineKeyboardButton("🏠 العودة للقائمة الرئيسية", callback_data="refresh")
+            )
+            gold_info = (
+                "🪙 **المرجع الشامل لأسعار الذهب (بالدولار الأمريكي)**\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"• **أونصة الذهب:** مبيع `$ {g['oz_sell']:,}` | شراء `$ {g['oz_buy']:,}`\n"
+                f"• **غرام عيار 24:** مبيع `$ {g['g24_sell']}` | شراء `$ {g['g24_buy']}`\n"
+                f"• **غرام عيار 21:** مبيع `$ {g['g21_sell']}` | شراء `$ {g['g21_buy']}`\n"
+                f"• **غرام عيار 18:** مبيع `$ {g['g18_sell']}` | شراء `$ {g['g18_buy']}`\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "👇 *اضغط على زر الحاسبة أدناه لحساب غراماتك المحددة بالليرة والدولار:*"
+            )
+            bot.edit_message_text(gold_info, cid, call.message.message_id, parse_mode="Markdown", reply_markup=markup)
+            bot.answer_callback_query(call.id)
+
+        elif call.data == "gold_calc_start":
             user_mode[uid] = "gold_calc"
-            bot.send_message(cid, "🪙 **حاسبة الذهب الذكية**\n\nأرسل عدد الغرامات لعيار 21 (مثلاً: `5`):", parse_mode="Markdown")
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("❌ إلغاء وعودة للقائمة", callback_data="refresh"))
+            bot.send_message(cid, "🪙 **حاسبة وزن الذهب الذكية**\n\nأرسل الآن عدد غرامات الذهب المطلوبة لعيار 21 (مثلاً: `5` أو `10`):", parse_mode="Markdown", reply_markup=markup)
             bot.answer_callback_query(call.id)
 
         elif call.data == "set_alert":
             user_mode[uid] = "waiting_alert"
-            bot.send_message(cid, "🔔 **ضبط منبّه الأسعار الذكي**\n\nأرسل السعر المستهدف لمبيع الدولار (مثلاً: `155`) وسأخبرك فور وصول السعر إليه:", parse_mode="Markdown")
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("❌ إلغاء وعودة للقائمة", callback_data="refresh"))
+            bot.send_message(cid, "🔔 **خدمة منبّه الأسعار الآلي**\n\nأرسل السعر المستهدف لمبيع الدولار الذي ترغب بمراقبته (مثلاً: `155` أو `160`) وسنقوم بتنبيهك فور وصول السوق إليه:", parse_mode="Markdown", reply_markup=markup)
             bot.answer_callback_query(call.id)
 
         elif call.data == "contact_admin":
             user_mode[uid] = "waiting_support_msg"
-            bot.send_message(
-                cid,
-                "📩 **التواصل المباشر مع الإدارة**\n\nاكتب رسالتك، استفسارك، أو اقتراحك الآن وسيتم إرسالها مباشرة إلى لوحة تحكم المشرف للرد عليك:",
-                parse_mode="Markdown"
-            )
-            bot.answer_callback_query(call.id)
-
-        elif call.data == "support_bot":
-            share_url = "https://" + "t." + f"me/share/url?url=https://t.me/{bot_username}?start=ref_{uid}&text=أنصحكم+ببوت+سوريا+كاش+لأسعار+العملات!"
             markup = types.InlineKeyboardMarkup()
-            markup.add(
-                types.InlineKeyboardButton("📤 مشاركة البوت لدعمنا", url=share_url),
-                types.InlineKeyboardButton("📩 مراسلة الإدارة للتبرع", callback_data="contact_admin")
-            )
+            markup.add(types.InlineKeyboardButton("❌ إلغاء وعودة للقائمة", callback_data="refresh"))
             bot.send_message(
                 cid,
-                "💝 **دعم وتطوير بوت سوريا كاش**\n\nنحن نعمل على مدار الساعة لتقديم أدق الأسعار وأسرع الخدمات مجاناً للجميع.\nيمكنك دعم استمرار البوت عبر مشاركته مع أصدقائك أو التواصل مع الإدارة للمساهمة في تطوير السيرفرات. شكراً من القلب! ❤️",
+                "📩 **التواصل المباشر مع طاقم الإدارة والدعم**\n\nاكتب رسالتك، استفسارك، أو اقتراحك الآن بكل أريحية، وسيتم تحويلها إلى لوحة تحكم المشرف للرد الفوري عليك:",
                 parse_mode="Markdown",
                 reply_markup=markup
             )
             bot.answer_callback_query(call.id)
 
-        elif call.data == "my_ref":
-            count = referrals.get(uid, 0)
-            ref_link = "https://" + "t." + f"me/{bot_username}?start=ref_{uid}"
+        elif call.data == "support_bot":
+            markup = types.InlineKeyboardMarkup(row_width=1)
+            markup.add(
+                types.InlineKeyboardButton("📩 مراسلة الإدارة للمساهمة", callback_data="contact_admin"),
+                types.InlineKeyboardButton("🏠 العودة للقائمة الرئيسية", callback_data="refresh")
+            )
             bot.send_message(
                 cid,
-                f"🏆 **نظام الدعوات والمكافآت - سوريا كاش**\n\n• عدد الأصدقاء الذين دعوتهم حتى الآن: **`{count}`**\n• رابط الدعوة الخاص بك:\n`{ref_link}`\n\nانسخ الرابط وانشره في المجموعات لتتصدر قائمة الداعمين!",
-                parse_mode="Markdown"
+                "💝 **الدعم والمساهمة في استمرار سوريا كاش**\n\nنحن نسعى لتقديم أسعار دقيقة وخدمات برمجية مجانية متكاملة على مدار الساعة.\nيمكنك دعم المشروع عبر التوصية بالبوت لأصدقائك أو التواصل مع المشرف للمساهمة في تطوير البنية التحتية. شكراً لثقتكم الغالية! ❤️",
+                parse_mode="Markdown",
+                reply_markup=markup
             )
             bot.answer_callback_query(call.id)
 
-        # أوامر لوحة تحكم المشرف
         elif call.data == "admin_read_tickets":
             bot.answer_callback_query(call.id)
             if not support_tickets:
-                bot.send_message(cid, "📭 لا توجد رسائل دعم جديدة في الوقت الحالي.")
+                bot.send_message(cid, "📭 لا توجد أي رسائل دعم جديدة معلقة في الوقت الحالي.", reply_markup=back_home_keyboard())
                 return
             for idx, ticket in enumerate(support_tickets):
                 markup = types.InlineKeyboardMarkup()
-                markup.add(types.InlineKeyboardButton("↩️ الرد على هذا المستخدم", callback_data=f"reply_to_{ticket['uid']}"))
+                markup.add(
+                    types.InlineKeyboardButton("↩️ الرد على هذا المستخدم", callback_data=f"reply_to_{ticket['uid']}"),
+                    types.InlineKeyboardButton("🗑 حذف الرسالة", callback_data=f"del_ticket_{idx}")
+                )
                 bot.send_message(
                     cid,
-                    f"📩 **رسالة دعم #{idx+1}**\n👤 من: {ticket['name']} (`{ticket['uid']}`)\n🕒 الوقت: {ticket['time']}\n\n💬 **الرسالة:**\n{ticket['text']}",
+                    f"📩 **رسالة دعم رقم ({idx+1})**\n👤 المُرسل: {ticket['name']} (`{ticket['uid']}`)\n🕒 التوقيت: {text=ticket['time']}\n\n💬 **محتوى الرسالة:**\n{ticket['text']}",
                     parse_mode="Markdown",
                     reply_markup=markup
                 )
@@ -349,30 +379,34 @@ def webhook():
             target_uid = int(call.data.replace("reply_to_", ""))
             reply_target[uid] = target_uid
             user_mode[uid] = "admin_replying"
-            bot.send_message(cid, f"✍️ اكتب الآن نص الرد لإرساله مباشرة إلى المستخدم (`{target_uid}`):", parse_mode="Markdown")
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("❌ إلغاء", callback_data="refresh"))
+            bot.send_message(cid, f"✍️ اكتب الآن نص الرد الرسمي لإرساله فوراً للمستخدم (`{target_uid}`):", parse_mode="Markdown", reply_markup=markup)
             bot.answer_callback_query(call.id)
 
         elif call.data == "admin_stats":
             bot.answer_callback_query(call.id)
-            total_refs = sum(referrals.values())
             bot.send_message(
                 cid,
-                f"📊 **إحصائيات النمو - سوريا كاش:**\n\n• إجمالي المستخدمين النشطين: `{len(subscribers)}`\n• إجمالي الدعوات الناجحة: `{total_refs}`\n• تنبيهات الأسعار النشطة: `{len(price_alerts)}`\n• رسائل الدعم الواردة: `{len(support_tickets)}`",
-                parse_mode="Markdown"
+                f"📊 **إحصائيات التشغيل والنشاط - سوريا كاش:**\n\n• إجمالي المستخدمين المسجلين: `{len(subscribers)}`\n• تنبيهات الأسعار الفعالة: `{len(price_alerts)}`\n• رسائل الدعم الواردة غير المنتهية: `{len(support_tickets)}`",
+                parse_mode="Markdown",
+                reply_markup=back_home_keyboard()
             )
 
         elif call.data == "admin_broadcast":
             user_mode[uid] = "waiting_for_broadcast"
-            bot.send_message(cid, "📢 أرسل الآن نص الإذاعة أو الإعلان لإرساله لجميع المشتركين:", parse_mode="Markdown")
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("❌ إلغاء", callback_data="refresh"))
+            bot.send_message(cid, "📢 أرسل الآن نص الإعلان أو الإذاعة البرمجية الذي تريد بثه لجميع المشتركين:", parse_mode="Markdown", reply_markup=markup)
             bot.answer_callback_query(call.id)
 
         elif call.data == "admin_force_post":
             d = get_all_prices()
             try:
                 bot.send_message(CHANNEL_USERNAME, format_bulletin(d, True), parse_mode="Markdown")
-                bot.answer_callback_query(call.id, "✅ تم النشر في القناة بنجاح!", show_alert=True)
+                bot.answer_callback_query(call.id, "✅ تم نشر النشرة الفورية في القناة بنجاح!", show_alert=True)
             except Exception as e:
-                bot.answer_callback_query(call.id, f"❌ خطأ في النشر: {e}", show_alert=True)
+                bot.answer_callback_query(call.id, f"❌ حدث خطأ أثناء النشر: {e}", show_alert=True)
 
     @bot.message_handler(func=lambda message: True)
     def handle_messages(message):
@@ -386,45 +420,48 @@ def webhook():
         mode = user_mode.get(uid, "usd_syp")
         text = message.text.strip()
 
-        # استقبال رسالة دعم من المستخدم وحفظها في لوحة التحكم
+        # معالجة رسائل الدعم وإعادة التشغيل التلقائي للقائمة الرئيسية
         if mode == "waiting_support_msg":
             user_mode[uid] = "usd_syp"
-            sender_name = message.from_user.first_name or "مستخدم"
+            sender_name = message.from_user.first_name or "مستخدم كريم"
             support_tickets.append({
                 "uid": uid,
                 "name": sender_name,
                 "text": text,
                 "time": time.strftime("%H:%M")
             })
-            bot.reply_to(message, "✅ **تم إرسال رسالتك بنجاح إلى لوحة تحكم الإدارة!**\nسيقوم المشرف بمراجعتها والرد عليك هنا قريباً.", parse_mode="Markdown")
+            d = get_all_prices()
+            bot.send_message(
+                cid,
+                "✅ **تم استلام رسالتك وإرسالها للإدارة بنجاح!**\nشكراً لتواصلك معنا، سنقوم بمراجعتها والرد عليك قريباً.\n\n*(تم إرجاعك للقائمة الرئيسية تلقائياً)*",
+                parse_mode="Markdown"
+            )
+            bot.send_message(cid, format_bulletin(d), parse_mode="Markdown", reply_markup=main_keyboard(bot_username))
             return
 
-        # رد المشرف على رسالة دعم
         if mode == "admin_replying":
             user_mode[uid] = "usd_syp"
             target_uid = reply_target.get(uid)
             if target_uid:
                 try:
-                    bot.send_message(target_uid, f"📩 **رد من إدارة سوريا كاش:**\n\n{text}", parse_mode="Markdown")
-                    bot.reply_to(message, "✅ تم إرسال ردك إلى المستخدم بنجاح!")
+                    bot.send_message(target_uid, f"📩 **إشعار رد رسمي من إدارة سوريا كاش:**\n\n{text}", parse_mode="Markdown")
+                    bot.reply_to(message, "✅ تم إرسال الرد بنجاح للمستخدم!", reply_markup=back_home_keyboard())
                 except Exception:
-                    bot.reply_to(message, "❌ تعذر إرسال الرد (ربما قام المستخدم بحظر البوت).")
+                    bot.reply_to(message, "❌ تعذر إرسال الرد (ربما قام المستخدم بحظر البوت أو توقفه).", reply_markup=back_home_keyboard())
             return
 
-        # إذاعة عامة من المشرف
         if mode == "waiting_for_broadcast":
             user_mode[uid] = "usd_syp"
             count = 0
             for sub_id in subscribers:
                 try:
-                    bot.send_message(sub_id, f"📢 **إعلان من سوريا كاش:**\n\n{text}", parse_mode="Markdown")
+                    bot.send_message(sub_id, f"📢 **إعلان هام من إدارة سوريا كاش:**\n\n{text}", parse_mode="Markdown")
                     count += 1
                 except Exception:
                     pass
-            bot.reply_to(message, f"✅ تم إرسال الإذاعة بنجاح إلى `{count}` مستخدم.")
+            bot.reply_to(message, f"✅ تم إرسال الإذاعة بنجاح إلى إجمالي `{count}` مستخدم نشط.", reply_markup=back_home_keyboard())
             return
 
-        # ضبط منبه السعر
         if mode == "waiting_alert":
             try:
                 target = float(text.replace(",", ""))
@@ -432,31 +469,44 @@ def webhook():
                     target = target / 100.0
                 price_alerts[uid] = target
                 user_mode[uid] = "usd_syp"
-                bot.reply_to(message, f"🔔 **تم تفعيل المنبّه!**\nسأرسل لك إشعاراً فور وصول سعر مبيع الدولار إلى **`{target:.2f}`** ل.س.", parse_mode="Markdown")
+                d = get_all_prices()
+                bot.send_message(
+                    cid,
+                    f"🔔 **تم تفعيل منبّه الأسعار بنجاح!**\nسنجري مراقبة مستمرة، وسنرسل لك إشعاراً فورياً فور وصول مبيع الدولار إلى السعر المستهدف: **`{target:.2f}`** ل.س.\n\n*(تم العودة للقائمة الرئيسية تلقائياً)*",
+                    parse_mode="Markdown"
+                )
+                bot.send_message(cid, format_bulletin(d), parse_mode="Markdown", reply_markup=main_keyboard(bot_username))
             except ValueError:
-                bot.reply_to(message, "⚠️ يرجى إدخال رقم صحيح للسعر المستهدف (مثلاً: `155`).")
+                bot.reply_to(message, "⚠️ يرجى إدخال رقم صحيح وواضح للسعر (مثلاً: `155` أو `155.5`).")
             return
 
-        # حاسبة الذهب
         if mode == "gold_calc":
             try:
                 grams = float(text.replace(",", ""))
                 d = get_all_prices()
+                g = d["gold"]
+                
+                total_usd = grams * g['g21_sell']
                 total_new = grams * d["gold_21_syp_new"]
                 total_old = int(total_new * 100)
-                total_usd = grams * d["gold_21_usd"]
+                
                 reply = (
-                    f"🪙 **حساب قيمة {grams} غرام ذهب (عيار 21):**\n"
-                    f"• بالليرة الجديدة: `{total_new:,.2f}` ل.س\n"
-                    f"• بالليرة القديمة: `{total_old:,}` ل.س\n"
-                    f"• بالدولار الأمريكي: `${total_usd:,.2f}`"
+                    f"🪙 **نتيجة حساب وزن الذهب ({grams} غرام - عيار 21):**\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"• **القيمة الإجمالية بالدولار:** `$ {total_usd:,.2f}`\n"
+                    f"• **القيمة بالليرة الجديدة:** ` {total_new:,.2f} ` ل.س\n"
+                    f"• **القيمة بالليرة القديمة:** ` {total_old:,} ` ل.س\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "*(تم إرجاعك للقائمة الرئيسية تلقائياً)*"
                 )
-                bot.reply_to(message, reply, parse_mode="Markdown")
+                user_mode[uid] = "usd_syp"
+                bot.send_message(cid, reply, parse_mode="Markdown")
+                bot.send_message(cid, format_bulletin(d), parse_mode="Markdown", reply_markup=main_keyboard(bot_username))
             except ValueError:
-                bot.reply_to(message, "⚠️ يرجى إدخال عدد الغرامات كرقم صحيح (مثلاً: `5`).")
+                bot.reply_to(message, "⚠️ يرجى إرسال رقم صحيح لعدد الغرامات (مثلاً: `5` أو `2.5`).")
             return
 
-        # حاسبة العملات التفاعلية
+        # حاسبة العملات والعودة التلقائية للقائمة الرئيسية بعد إتمام العملية بنجاح
         try:
             amount = float(text.replace(",", ""))
             d = get_all_prices()
@@ -465,27 +515,31 @@ def webhook():
             if mode == "usd_syp":
                 res_new = amount * rate_new
                 res_old = int(res_new * 100)
-                reply = f"💵 **{amount:,} دولار أمريكي يساوي:**\n• بالجديدة: `{res_new:,.2f}` ل.س\n• بالقديمة: `{res_old:,}` ل.س"
+                reply = f"💵 **حساب التحويل ({amount:,.2f} دولار أمريكي):**\n• بالليرة الجديدة: ` {res_new:,.2f} ` ل.س\n• بالليرة القديمة: ` {res_old:,} ` ل.س"
             elif mode == "syp_usd":
                 usd_val = amount / (rate_new * 100) if amount >= 2000 else amount / rate_new
-                reply = f"🇸🇾 **{amount:,.0f} ليرة سورية** تساوي:\n💵 **`{usd_val:,.2f}` دولار أمريكي**"
+                reply = f"🇸🇾 **حساب التحويل ({amount:,.0f} ليرة سورية):**\n💵 القيمة بالدولار: **` {usd_val:,.2f} ` دولار**"
             elif mode == "try_syp":
                 try_in_syp = rate_new / d["try_rate"]
                 res_new = amount * try_in_syp
                 res_old = int(res_new * 100)
-                reply = f"🇹🇷 **{amount:,} ليرة تركية تساوي:**\n• بالجديدة: `{res_new:,.2f}` ل.س\n• بالقديمة: `{res_old:,}` ل.س"
+                reply = f"🇹🇷 **حساب التحويل ({amount:,.2f} ليرة تركية):**\n• بالليرة الجديدة: ` {res_new:,.2f} ` ل.س\n• بالليرة القديمة: ` {res_old:,} ` ل.س"
             elif mode == "eur_syp":
                 eur_in_syp = rate_new * (d["eur_usd"] / 100.0) if d["eur_usd"] > 10 else rate_new * d["eur_usd"]
                 res_new = amount * eur_in_syp
                 res_old = int(res_new * 100)
-                reply = f"🇪🇺 **{amount:,} يورو يساوي:**\n• بالجديدة: `{res_new:,.2f}` ل.س\n• بالقديمة: `{res_old:,}` ل.س"
+                reply = f"🇪🇺 **حساب التحويل ({amount:,.2f} يورو):**\n• بالليرة الجديدة: ` {res_new:,.2f} ` ل.س\n• بالليرة القديمة: ` {res_old:,} ` ل.س"
             else:
                 res_new = amount * rate_new
-                reply = f"💵 **{amount:,} دولار يساوي:** `{res_new:,.2f}` ل.س جديدة"
+                reply = f"💵 **النتيجة:** ` {res_new:,.2f} ` ل.س جديد"
 
-            bot.reply_to(message, reply, parse_mode="Markdown")
+            # إعادة تعيين الوضع وإظهار النشرة والقائمة الرئيسية تلقائياً
+            user_mode[uid] = "usd_syp"
+            bot.send_message(cid, f"{reply}\n\n*(تم إرجاعك للقائمة الرئيسية تلقائياً)*", parse_mode="Markdown")
+            bot.send_message(cid, format_bulletin(d), parse_mode="Markdown", reply_markup=main_keyboard(bot_username))
+            
         except ValueError:
-            bot.reply_to(message, "⚠️ يرجى إدخال رقم صحيح للتحويل، أو اختر إحدى الخدمات من الأزرار أسفل النشرة.")
+            bot.reply_to(message, "⚠️ عذراً، يرجى إرسال رقم صحيح للتحويل، أو استخدم الأزرار التفاعلية الموجودة أسفل النشرة.")
 
     if request.method == 'POST':
         json_string = request.get_data().decode('utf-8')
@@ -493,4 +547,4 @@ def webhook():
         bot.process_new_updates([update])
         return "OK", 200
         
-    return "Syria Cash Bot Pro is Running 24/7!", 200
+    return "Syria Cash Pro - Running Smoothly 24/7!", 200
