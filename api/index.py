@@ -50,16 +50,12 @@ def get_all_prices():
     except Exception:
         pass
 
-    # حساب أسعار الذهب بالدولار فقط (مبيع وشراء افتراضي بفرق بسيط)
     oz_buy = data["gold_oz"]
     oz_sell = oz_buy + 5.0
-    
     g24_buy = oz_buy / 31.1035
     g24_sell = oz_sell / 31.1035
-    
     g21_buy = g24_buy * 0.875
     g21_sell = g24_sell * 0.875
-    
     g18_buy = g24_buy * 0.750
     g18_sell = g24_sell * 0.750
 
@@ -70,7 +66,6 @@ def get_all_prices():
         "g18_buy": round(g18_buy, 2), "g18_sell": round(g18_sell, 2),
     }
 
-    # للتقييم السوري القديم للذهب
     gold_21_syp_new = round(g21_sell * data["syp_sell_new"], 2)
     data["gold_21_syp_new"] = gold_21_syp_new
     data["gold_21_syp_old"] = int(gold_21_syp_new * 100)
@@ -370,7 +365,7 @@ def webhook():
                 )
                 bot.send_message(
                     cid,
-                    f"📩 **رسالة دعم رقم ({idx+1})**\n👤 المُرسل: {ticket['name']} (`{ticket['uid']}`)\n🕒 التوقيت: {text=ticket['time']}\n\n💬 **محتوى الرسالة:**\n{ticket['text']}",
+                    f"📩 **رسالة دعم رقم ({idx+1})**\n👤 المُرسل: {ticket['name']} (`{ticket['uid']}`)\n🕒 التوقيت: {ticket['time']}\n\n💬 **محتوى الرسالة:**\n{ticket['text']}",
                     parse_mode="Markdown",
                     reply_markup=markup
                 )
@@ -420,7 +415,6 @@ def webhook():
         mode = user_mode.get(uid, "usd_syp")
         text = message.text.strip()
 
-        # معالجة رسائل الدعم وإعادة التشغيل التلقائي للقائمة الرئيسية
         if mode == "waiting_support_msg":
             user_mode[uid] = "usd_syp"
             sender_name = message.from_user.first_name or "مستخدم كريم"
@@ -485,7 +479,6 @@ def webhook():
                 grams = float(text.replace(",", ""))
                 d = get_all_prices()
                 g = d["gold"]
-                
                 total_usd = grams * g['g21_sell']
                 total_new = grams * d["gold_21_syp_new"]
                 total_old = int(total_new * 100)
@@ -506,7 +499,6 @@ def webhook():
                 bot.reply_to(message, "⚠️ يرجى إرسال رقم صحيح لعدد الغرامات (مثلاً: `5` أو `2.5`).")
             return
 
-        # حاسبة العملات والعودة التلقائية للقائمة الرئيسية بعد إتمام العملية بنجاح
         try:
             amount = float(text.replace(",", ""))
             d = get_all_prices()
@@ -533,7 +525,6 @@ def webhook():
                 res_new = amount * rate_new
                 reply = f"💵 **النتيجة:** ` {res_new:,.2f} ` ل.س جديد"
 
-            # إعادة تعيين الوضع وإظهار النشرة والقائمة الرئيسية تلقائياً
             user_mode[uid] = "usd_syp"
             bot.send_message(cid, f"{reply}\n\n*(تم إرجاعك للقائمة الرئيسية تلقائياً)*", parse_mode="Markdown")
             bot.send_message(cid, format_bulletin(d), parse_mode="Markdown", reply_markup=main_keyboard(bot_username))
